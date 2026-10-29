@@ -142,7 +142,8 @@ function makeWaterfall(parent, time) {
     const positions = [], uvs = [], indices = [], rows = 72, columns = 16;
     for (let j = 0; j <= rows; j++) {
       const t = j / rows;
-      const width = initialWidth * (1 - t * .24) * (layer ? .80 : 1);
+      const width = initialWidth * (1 - t * .30)
+        * (1 + .028 * Math.sin(t * 21 + layer * 1.7)) * (layer ? .80 : 1);
       for (let i = 0; i <= columns; i++) {
         const u = i / columns;
         positions.push(
@@ -160,9 +161,9 @@ function makeWaterfall(parent, time) {
       indices.push(a, b, a + 1, a + 1, b, b + 1);
     }
     const curtainMaterial = new THREE.MeshPhysicalMaterial({
-      color: layer ? '#c0d7d0' : '#83b0ac', roughness: layer ? .23 : .17,
+      color: layer ? '#e2eae0' : '#98bab4', roughness: layer ? .25 : .19,
       metalness: 0, ior: 1.333, clearcoat: .65, clearcoatRoughness: .17,
-      transparent: true, opacity: layer ? .42 : .66,
+      transparent: true, opacity: layer ? .31 : .58,
       side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.45,
     });
     curtainMaterial.onBeforeCompile = shader => {
@@ -180,10 +181,14 @@ float fold = .5 + .5 * sin(vFallUv.x * 37.0
   + sin(vFallUv.y * 6.0 - uTime * 1.8) * 1.3);
 diffuseColor.rgb *= .78 + .22 * fold;`)
         .replace('#include <alphatest_fragment>', `
-float curtainEdge = smoothstep(.0, .065, vFallUv.x) * (1.0 - smoothstep(.935, 1.0, vFallUv.x));
-float curtainEnd = 1.0 - smoothstep(.78, 1.0, vFallUv.y);
-float curtainThreads = .84 + .16 * sin(vFallUv.x * 79.0
-  + sin(vFallUv.y * 7.0 - uTime * 2.7) * 1.2);
+float edgeSoftness = .075 + .018 * sin(vFallUv.y * 22.0 - uTime * 1.5);
+float curtainEdge = smoothstep(.0, edgeSoftness, vFallUv.x)
+  * (1.0 - smoothstep(1.0-edgeSoftness, 1.0, vFallUv.x));
+float curtainEnd = 1.0 - smoothstep(.70, 1.0, vFallUv.y);
+float threadPhase = vFallUv.x * 49.0 + sin(vFallUv.y * 7.0 - uTime * 2.3) * 1.2;
+float resolvedThreads = .43 + .57 * smoothstep(.12, .90, .5 + .5 * sin(threadPhase));
+// Fine filaments merge at a distance, preventing bright pixel-wide shimmer.
+float curtainThreads = mix(resolvedThreads, .74, smoothstep(.18, .85, fwidth(vFallUv.x) * 49.0));
 diffuseColor.a *= curtainEdge * curtainEnd * curtainThreads;
 #include <alphatest_fragment>`)
         .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -213,8 +218,8 @@ normal = normalize(max(abs(fallDet), .0000001) * normal - fallGradient);`);
   mistGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   mistGeometry.setAttribute('aMistSeed', new THREE.Float32BufferAttribute(seeds, 1));
   const mistMaterial = new THREE.PointsMaterial({
-    color: '#d5dfd8', map: mistTexture(), size: .33, sizeAttenuation: true,
-    transparent: true, opacity: .13, depthWrite: false,
+    color: '#e1e7db', map: mistTexture(), size: .40, sizeAttenuation: true,
+    transparent: true, opacity: .16, depthWrite: false,
   });
   mistMaterial.onBeforeCompile = shader => {
     shader.uniforms.uTime = time;

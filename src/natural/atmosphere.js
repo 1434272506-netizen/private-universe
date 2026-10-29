@@ -8,9 +8,9 @@ export function makeAtmosphere(scene, renderer, time) {
     side: THREE.BackSide, depthWrite: false, toneMapped: false,
     uniforms: {
       uTime: time,
-      uZenith: {value: new THREE.Color('#91bbd8')},
-      uHorizon: {value: new THREE.Color('#c0dce9')},
-      uLower: {value: new THREE.Color('#a9cce0')},
+      uZenith: {value: new THREE.Color('#79aacb')},
+      uHorizon: {value: new THREE.Color('#c3d3d9')},
+      uLower: {value: new THREE.Color('#d7dfd7')},
     },
     vertexShader: `varying vec3 vDirection;
       void main() { vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
@@ -30,16 +30,18 @@ export function makeAtmosphere(scene, renderer, time) {
       }
       void main(){
         vec3 d=normalize(vDirection);
-        vec3 color=mix(uHorizon,uZenith,smoothstep(-.12,.88,d.y));
-        color=mix(color,uLower,1.0-smoothstep(-.94,-.13,d.y));
+        // The camera looks down from a high island. Carry the atmospheric
+        // gradient into that visible lower hemisphere instead of leaving it flat.
+        vec3 color=mix(uHorizon,uZenith,smoothstep(-.72,.60,d.y));
+        color=mix(color,uLower,1.0-smoothstep(-.96,-.46,d.y));
         float sun=max(dot(d,normalize(vec3(-.7,.62,.4))),0.0);
-        color+=vec3(.038,.027,.009)*pow(sun,8.0);
+        color+=vec3(.048,.032,.012)*pow(sun,6.0);
         vec2 p=d.xz/max(.25,d.y+.43)*2.1+vec2(uTime*.0009,0.0);
         float vapor=fbm(p*1.7+3.0);
-        float highCloud=smoothstep(.54,.77,vapor)*smoothstep(-.08,.29,d.y)*.20;
+        float highCloud=smoothstep(.54,.77,vapor)*smoothstep(-.20,.25,d.y)*.17;
         float lowCloud=smoothstep(.53,.76,fbm(d.xz*7.0+vec2(uTime*.0007,13.0)))
-          *smoothstep(-.97,-.66,d.y)*(1.0-smoothstep(-.28,.02,d.y))*.13;
-        color=mix(color,vec3(.91,.94,.94),highCloud+lowCloud);
+          *smoothstep(-.97,-.66,d.y)*(1.0-smoothstep(-.28,.02,d.y))*.10;
+        color=mix(color,vec3(.93,.945,.91),highCloud+lowCloud);
         gl_FragColor=vec4(color,1.0);
         #include <colorspace_fragment>
       }`,
@@ -55,7 +57,7 @@ export function makeAtmosphere(scene, renderer, time) {
   clouds.name='distant-clouds';
   const addCloud=(x,y,z,width,index,opacity)=>{
     const material=new THREE.SpriteMaterial({
-      map:textures[index%3],color:'#f9fbf8',opacity,depthWrite:false,
+      map:textures[index%3],color:'#fffaf1',opacity,depthWrite:false,
       fog:false,toneMapped:false,
     });
     const cloud=new THREE.Sprite(material);
@@ -75,6 +77,11 @@ export function makeAtmosphere(scene, renderer, time) {
   addCloud(-27,-20,-31,21,12,.48);
   addCloud(30,-24,-36,23,13,.46);
   addCloud(-12,-43,-45,30,14,.54);
+  // Broad, staggered banks sit behind and below the island's solid geometry.
+  // Depth testing preserves the tree, ribbon and rock silhouette in every orbit.
+  addCloud(-24,-14,-30,29,15,.72);
+  addCloud(25,-18,-33,34,16,.67);
+  addCloud(-3,-24,-61,61,17,.65);
   scene.add(clouds);
 
   const environmentScene=new THREE.Scene();

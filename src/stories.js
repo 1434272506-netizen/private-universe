@@ -1,5 +1,9 @@
-import {memories,letters} from './personal-content.js';
+import {memories as suppliedMemories,letters as suppliedLetters} from './personal-content.js';
 import './stories.css';
+
+const records=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
+const contentText=value=>typeof value==='string'?value:typeof value==='number'?String(value):'';
+const memories=records(suppliedMemories),letters=records(suppliedLetters);
 
 const element=(tag,className,text)=>{
   const node=document.createElement(tag);
@@ -12,14 +16,19 @@ function button(text,className,action){
   node.addEventListener('click',action);return node;
 }
 function dateLabel(value){
-  const date=element('time','story-date',value||'');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(value||''))date.dateTime=value;
+  const label=contentText(value).trim();
+  const date=element('time','story-date',label);
+  date.hidden=!label;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(label))date.dateTime=label;
   return date;
 }
 function photograph(memory,eager=false){
   const frame=element('div','story-photograph');
-  const image=element('img');image.alt=memory.caption||'一段共同的回忆';
+  const image=element('img');image.alt=contentText(memory.alt)||contentText(memory.caption)||'一段共同的回忆';
   image.loading=eager?'eager':'lazy';image.decoding='async';
+  image.addEventListener('load',()=>{
+    frame.dataset.orientation=image.naturalHeight>image.naturalWidth?'portrait':'landscape';
+  },{once:true});
   const fallback=element('div','photo-unavailable');fallback.hidden=true;
   fallback.append(element('span',null,'照片暂时没有打开'),element('small',null,'这段回忆的文字仍在这里。'));
   const fail=()=>{image.hidden=true;fallback.hidden=false;frame.classList.add('is-unavailable');};
@@ -52,13 +61,15 @@ function prepareMemories(root){
   function showCollection(focus=false){
     current=-1;root.replaceChildren();root.classList.remove('is-reading-photo');
     const note=element('p','collection-note','轻点照片，慢慢看。');
+    if(memories.length>1)note.append(element('span','collection-scroll-hint','左右滑动，继续这一段回忆。'));
     const track=element('div','memory-track');track.setAttribute('aria-label','丝带上的照片');
     memories.forEach((memory,index)=>{
       const card=element('figure','memory-card');
+      const caption=contentText(memory.caption);
       const open=button('', 'open-memory',()=>{origin=index;showPhoto(index);});
-      open.setAttribute('aria-label',`查看第 ${index+1} 张照片${memory.caption?`：${memory.caption}`:''}`);
+      open.setAttribute('aria-label',`查看第 ${index+1} 张照片${caption?`：${caption}`:''}`);
       open.append(photograph(memory));
-      card.append(open,element('figcaption',null,memory.caption||''),dateLabel(memory.date));track.append(card);
+      card.append(open,element('figcaption',null,caption),dateLabel(memory.date));track.append(card);
     });
     root.append(note,track);resetScroll(dialog);
     if(focus){const active=track.querySelectorAll('button')[origin];active?.focus({preventScroll:true});if(active)track.scrollLeft=active.offsetLeft-track.offsetLeft;}
@@ -70,7 +81,7 @@ function prepareMemories(root){
     const count=element('span','story-position',`${index+1} / ${memories.length}`);count.setAttribute('aria-live','polite');
     toolbar.append(back,count);
     const figure=element('figure','memory-reader');figure.append(photograph(memory,true));
-    const caption=element('figcaption',null,memory.caption||'');caption.append(dateLabel(memory.date));figure.append(caption);
+    const caption=element('figcaption',null,contentText(memory.caption));caption.append(dateLabel(memory.date));figure.append(caption);
     const pagination=element('nav','story-pagination');pagination.setAttribute('aria-label','切换照片');
     const prev=button('← 上一张','story-page-button',()=>showPhoto(current-1));prev.disabled=index===0;
     const next=button('下一张 →','story-page-button',()=>showPhoto(current+1));next.disabled=index===memories.length-1;
@@ -99,9 +110,9 @@ function prepareLetters(root){
       open.dataset.identity=letter.identity==='green'?'green':'purple';
       const seal=element('span','letter-seal');seal.setAttribute('aria-hidden','true');
       const description=element('span','envelope-description');
-      description.append(element('span','envelope-title',letter.title||'一封信'));
+      description.append(element('span','envelope-title',contentText(letter.title)||'一封信'));
       const metadata=element('span','envelope-meta');
-      if(letter.from)metadata.append(element('span',null,letter.from));
+      if(contentText(letter.from))metadata.append(element('span',null,contentText(letter.from)));
       metadata.append(dateLabel(letter.date));description.append(metadata);
       const arrow=element('span','envelope-arrow','↗');arrow.setAttribute('aria-hidden','true');
       open.append(seal,description,arrow);list.append(open);
@@ -114,10 +125,10 @@ function prepareLetters(root){
     const toolbar=element('nav','story-reading-tools');toolbar.setAttribute('aria-label','信件阅读');
     const back=button('← 回到信件','story-back',()=>showEnvelopes(true));toolbar.append(back);
     const article=element('article','single-letter');article.dataset.identity=letter.identity==='green'?'green':'purple';
-    article.append(element('h3',null,letter.title||'一封信'),element('p','single-letter-body',letter.body||''));
+    article.append(element('h3',null,contentText(letter.title)||'一封信'),element('p','single-letter-body',contentText(letter.body)));
     const footer=element('footer','single-letter-signature');
     const signature=element('span');const mark=element('span',`identity-mark ${article.dataset.identity}`);mark.setAttribute('aria-hidden','true');
-    signature.append(mark,document.createTextNode(letter.from?` ${letter.from}`:''));
+    signature.append(mark,document.createTextNode(contentText(letter.from)?` ${contentText(letter.from)}`:''));
     footer.append(signature,dateLabel(letter.date));article.append(footer);
     root.append(toolbar,article);resetScroll(dialog);back.focus({preventScroll:true});
   }

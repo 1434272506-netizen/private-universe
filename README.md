@@ -2,6 +2,8 @@
 
 给两个人的私人春日花园。PC 展示优先，以 Vite + JavaScript + Three.js 实时渲染，可环绕观察、靠近物件并发现隐藏入口。2026-10-29 已恢复误回退的水深、植被、接触阴影和远景精修，并接入 Blender/MTree 实际制作的中心母树 GLB；保留照片大图和逐封信件阅读。
 
+本次画面收尾进一步调整天空/低云与薄瀑、近景文字对比和阅读排版。白丝带从实际枝头投影位置延展为阅读长卷，关闭后收回；减少动态效果时直接呈现。素材暂未提供，添加步骤见 [照片与信件添加指南](CONTENT-GUIDE.md)。
+
 ## 中心母树
 
 实际模型为 `public/models/love-tree.glb`，包含连续融合的枝干与板根、宽冠叶幕、真实树皮/透明橡叶贴图和 `RibbonAnchor` 挂点。丝带、相机近景与遮挡注册在模型加载后初始化；加载失败时显示“重新打开”，不会提前进入未完成的场景。
@@ -43,6 +45,8 @@ npm run dev
 
 照片文件可放入 `public/memories/`，`image` 使用 `/memories/文件名.jpg` 一类路径。`identity` 使用 `purple` 或 `green`：紫色代表用户，绿色代表她。当前配置随本地源码和构建产物提供；尚无网页上传、编辑、寄信或服务器保存功能。
 
+`personal-content.js` 已附中文注释模板，可选 `alt` 描述照片画面，未知日期可留空。添加后运行 `npm run check:content` 检查文件、字段、日期和正文，再打开花园查看。当前两个数组依然为空，没有自动填入测试照片或信件。
+
 ## 场景与结构
 
 主岛保留左侧记忆树、枝头白丝带、中部浅溪与天然踏石、前右薄瀑，以及右侧奶油白信箱和浅橡木长椅。白色雏菊、淡紫野花、少量柔和彩球、厚实不规则岩土断面、低处云层和远处小岛共同形成高空春日空间。
@@ -59,7 +63,7 @@ node scripts/review-overall-design.mjs
 node scripts/review-stories.mjs
 ```
 
-也可在开发服务运行时执行 `npm test`，依次运行场景、阅读和新树专用检查；`npm run test:tree` 单独验证 GLB、尺寸、挂点、遮挡、GTAO、实体点击及加载失败重试。新树检查记录在 `work/qa/love-tree/`。
+也可在开发服务运行时执行 `npm test`，先检查内容配置，再依次运行场景、阅读、新树和丝带过渡专项检查；`npm run test:tree` 与 `npm run test:presentation` 可分别执行后两组。新树记录在 `work/qa/love-tree/`，展开/中断/减少动态效果记录在 `work/qa/ribbon-transition/`。
 
 该脚本使用本机 Edge 与 Playwright，检查邀请页、可跳过开场、场景物件点击、阅读层与空状态、返回镜头、拖动和点击的区分、长椅视角、缩放边界、减少动态效果及多视角渲染。结果写入 `screenshots/overall-design-review.json`，截图为 `screenshots/design-*.png`。
 
@@ -85,6 +89,7 @@ node scripts/smoke-production.mjs
 - [网站完善指引](../网站完善指引.md) 汇总当前未完善功能、已确认设计、建议顺序、依赖和验收标准，供后续开发接手。
 - [GitHub 参考与借鉴计划](REFERENCES.md) 记录实际核实的 Napali 源码、固定版本、本轮采用的方法与后续研究顺序。
 - [最新母树实施报告](REPORT-2026-10-29-TREE-IMPLEMENTATION.md) 记录基线恢复、实际模型、接入与 49 项检查；[第二轮开发记录](REPORT-2026-10-28-REFERENCE-REFINEMENT.md) 保留此前环境与阅读功能的历史记录。
+- [画面收尾与素材添加报告](REPORT-2026-10-29-VISUAL-FINISH.md) 记录本次环境、阅读、丝带过渡和静态素材添加途径，以及 59 项页面/交互检查。
 - `DESIGN-SOURCE.md` 保存原始 V0.1 brief、来源和后续恢复记录；双方原文位于上一级 `对话恢复/总体设计-消息原文.json`。
 - `DESIGN.md` 区分总体设计已确认方向、当前实现和仍待完成的体验。旧报告保留其发生日期，仅反映当时状态。
 - 当前着重电脑上的全景、自然空间和隐藏入口。声音与音乐、登录身份、双人同步、共同在线标记、网页上传编辑，以及气球创建、接收者权限、放飞与档案流程尚未实现；不会将本地物件展示视为完整双人系统。

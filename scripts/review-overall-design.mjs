@@ -1,6 +1,7 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {memories,letters} from '../src/personal-content.js';
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});
 const errors=[],checks=[],metrics=[];
@@ -31,7 +32,8 @@ try{
   const original=await page.evaluate(()=>({position:window.__PU.camera.position.toArray(),target:window.__PU.controls.target.toArray()}));
   await check('Physical ribbon opens the memory scroll',async()=>{
     await clickObject('ribbon');await page.locator('#memory-dialog').waitFor({state:'visible',timeout:10000});await page.waitForTimeout(1000);
-    assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
+    if(memories.length)assert.equal(await page.locator('.memory-card').count(),memories.length);
+    else assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
     assert.equal(await page.evaluate(()=>window.__PU.controls.enabled),false);
   });await capture('design-memory');
   await check('Escape closes scroll and restores prior camera',async()=>{
@@ -39,10 +41,11 @@ try{
     const after=await page.evaluate(()=>({position:window.__PU.camera.position.toArray(),target:window.__PU.controls.target.toArray()}));
     for(const key of ['position','target'])for(let i=0;i<3;i++)assert.ok(Math.abs(original[key][i]-after[key][i])<.002);
   });
-  await check('Physical mailbox opens and shows honest empty letter state',async()=>{
+  await check('Physical mailbox opens and shows the configured letter state',async()=>{
     await clickObject('mailbox');await page.locator('#letter-dialog').waitFor({state:'visible',timeout:10000});await page.waitForTimeout(1000);
     assert.equal(await page.evaluate(()=>window.__PU.props.mailbox.userData.open),true);
-    assert.equal(await page.getByText('信箱还空着。',{exact:true}).isVisible(),true);
+    if(letters.length)assert.equal(await page.locator('.letter-envelope').count(),letters.length);
+    else assert.equal(await page.getByText('信箱还空着。',{exact:true}).isVisible(),true);
   });await capture('design-letter');
   await page.getByRole('button',{name:'收好信纸'}).click();await page.locator('#letter-dialog').waitFor({state:'hidden'});await settled();
   await check('Mailbox closes on return',async()=>assert.equal(await page.evaluate(()=>window.__PU.props.mailbox.userData.open),false));

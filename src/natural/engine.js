@@ -8,6 +8,7 @@ import {makeAtmosphere} from './atmosphere.js';
 import {prepareStories} from '../stories.js';
 import {makeLighting} from './lighting.js';
 import {loadCenterpieceTree} from './loveTree.js';
+import {presentRibbon} from '../ribbon-transition.js';
 
 const $=selector=>document.querySelector(selector);
 const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
@@ -93,6 +94,7 @@ Object.assign(presets.tree,{target:ribbonTarget.toArray(),position:ribbonTarget.
 let elapsed=0,lastFrame=performance.now(),ready=false,phase='invitation';
 let currentView='hero',flight=null,intro=null,savedView=null,pendingStory=null,activePlace=null,activeDialog=null;
 let shadowUntil=0,hintUntil=0,closing=false;
+let ribbonPresentation=null;
 const ease=t=>t*t*t*(t*(t*6-15)+10);
 function announce(text){$('#announcement').textContent=text;}
 function setPhase(next){phase=next;app.dataset.phase=next;canvasUI.inert=next!=='exploring';}
@@ -171,6 +173,7 @@ function showStory(kind){
   surface.style.setProperty('--origin-x',`${50+point.x*45}%`);
   surface.style.setProperty('--origin-y',`${50-point.y*45}%`);
   activeDialog=dialog;controls.enabled=false;dialog.classList.remove('is-closing');dialog.showModal();
+  if(kind==='ribbon')ribbonPresentation=presentRibbon(dialog,{x:(point.x*.5+.5)*innerWidth,y:(-.5*point.y+.5)*innerHeight},{reducedMotion});
   dialog.querySelector('.close-story').focus({preventScroll:true});
 }
 function discover(kind){
@@ -185,13 +188,14 @@ function discover(kind){
   }});
   announce(kind==='bench'?'坐在长椅上看一会儿风景。':kind==='ribbon'?'走近记忆树的白丝带。':'走近春日里的信箱。');
 }
-function closeStory(){
+async function closeStory(){
   if(!activeDialog||closing)return;
   const dialog=activeDialog;closing=true;dialog.classList.add('is-closing');
-  setTimeout(()=>{
-    dialog.close();dialog.classList.remove('is-closing');activeDialog=null;closing=false;
-    returnToGarden();$('#help-toggle').focus({preventScroll:true});
-  },reducedMotion?0:350);
+  if(ribbonPresentation&&dialog.id==='memory-dialog')await ribbonPresentation.close({immediate:reducedMotion});
+  else if(!reducedMotion)await new Promise(resolve=>setTimeout(resolve,350));
+  dialog.close();ribbonPresentation?.dispose();ribbonPresentation=null;
+  dialog.classList.remove('is-closing');activeDialog=null;closing=false;
+  returnToGarden();$('#help-toggle').focus({preventScroll:true});
 }
 prepareStories();
 for(const dialog of document.querySelectorAll('.story-dialog')){

@@ -4,12 +4,14 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node scripts/review-overall-design.mjs && node scripts/review-stories.mjs && node scripts/review-love-tree.mjs",
+    "test": "npm run check:content && node scripts/review-overall-design.mjs && node scripts/review-stories.mjs && node scripts/review-love-tree.mjs && node scripts/review-ribbon-transition.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "test:tree": "node scripts/review-love-tree.mjs",
-    "test:production": "node scripts/smoke-production.mjs"
+    "test:production": "node scripts/smoke-production.mjs",
+    "check:content": "node scripts/check-content.mjs",
+    "test:presentation": "node scripts/review-ribbon-transition.mjs"
   },
   "keywords": [],
   "author": "",
