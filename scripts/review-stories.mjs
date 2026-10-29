@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {providedPhotoImport} from '../src/personal-content.js';
 import {prepareEmptyFixtureCollection,waitForContentReady} from './review-fixture-storage.mjs';
+import {waitForPhotoPage,goToPhotoPage,currentPhoto} from './review-photo-helpers.mjs';
 
 // Fixtures are intercepted in this browser only, never written as personal content.
 const svg=(w,h,color)=>`data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><text x="15" y="35" font-size="20">LAYOUT TEST ONLY</text></svg>`)}`;
@@ -54,26 +55,23 @@ try{
   await openPlace('ribbon');await page.locator('#memory-dialog').waitFor({state:'visible'});
   await page.screenshot({path:'screenshots/stories-fixture-ribbon.png'});
   await check('Photos open large without cropping and support previous/next navigation',async()=>{
-    await page.locator('.open-memory').first().click();
+    await waitForPhotoPage(page,1,3);assert.equal(await page.locator('.album-page').count(),1);
     assert.equal(await page.locator('.story-position').textContent(),'1 / 3');
-    assert.equal(await page.getByRole('button',{name:'← 上一张',exact:true}).isDisabled(),true);
-    await page.getByRole('button',{name:'下一张 →',exact:true}).click();
+    assert.equal(await page.getByRole('button',{name:'← 上一页',exact:true}).isDisabled(),true);
+    await page.getByRole('button',{name:'下一页 →',exact:true}).click();await waitForPhotoPage(page,2,3);
     assert.equal(await page.locator('.story-position').textContent(),'2 / 3');
-    assert.equal(await page.locator('.memory-reader img').evaluate(el=>getComputedStyle(el).objectFit),'contain');
+    assert.equal(await currentPhoto(page).evaluate(el=>getComputedStyle(el).objectFit),'contain');
   });
   await page.screenshot({path:'screenshots/stories-fixture-photo.png'});
   await check('Unavailable photo keeps a clear fallback and caption',async()=>{
-    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');await waitForPhotoPage(page,3,3);
     await page.locator('.memory-reader .photo-unavailable').waitFor({state:'visible'});
     assert.ok((await page.locator('.memory-reader figcaption').textContent()).includes(fixtures.memories[2].caption));
-    assert.equal(await page.getByRole('button',{name:'下一张 →',exact:true}).isDisabled(),true);
+    assert.equal(await page.getByRole('button',{name:'下一页 →',exact:true}).isDisabled(),true);
   });
-  await check('Escape returns to ribbon and restores photo focus',async()=>{
-    await page.keyboard.press('Escape');
-    assert.equal(await page.locator('#memory-dialog').isVisible(),true);
-    assert.equal(await page.locator('.open-memory').first().evaluate(el=>el===document.activeElement),true);
+  await check('Escape closes the paged album directly',async()=>{
+    await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});
   });
-  await closeDialog('memory-dialog');
   await page.setViewportSize({width:390,height:844});
   await openPlace('mailbox');await page.locator('.letter-envelope').nth(1).click();
   await check('Long letter and title fit a narrow screen; start and end remain reachable',async()=>{
@@ -86,14 +84,14 @@ try{
   await page.screenshot({path:'screenshots/stories-fixture-long-letter-390.png'});
   await page.keyboard.press('Escape');
   assert.ok(await page.locator('.letter-envelope').nth(1).evaluate(el=>el===document.activeElement));
-  await closeDialog('letter-dialog');await openPlace('ribbon');await page.locator('.open-memory').nth(1).click();
+  await closeDialog('letter-dialog');await openPlace('ribbon');await goToPhotoPage(page,2,3);
   await check('Portrait photo remains readable at 390px without horizontal overflow',async()=>{
     assert.ok(await page.locator('#memory-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
-    const bounds=await page.locator('.memory-reader img').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
+    const bounds=await currentPhoto(page).boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
   });
   await page.screenshot({path:'screenshots/stories-fixture-photo-390.png'});
   await closeDialog('memory-dialog');await openPlace('ribbon');
-  await check('Reopening a closed dialog returns to its collection',async()=>assert.equal(await page.locator('.open-memory').count(),3));
+  await check('Reopening the paged album keeps the last page read',async()=>{await waitForPhotoPage(page,2,3);assert.equal(await page.locator('.album-page').count(),1);});
   assert.deepEqual(errors,[]);checks.push('No browser errors with content fixtures');
 }finally{
   await fs.writeFile('screenshots/stories-review.json',JSON.stringify({fixtureOnly:true,checks,errors},null,2));await browser.close();

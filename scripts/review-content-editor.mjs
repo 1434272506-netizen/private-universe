@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {memories as staticMemories,letters as staticLetters} from '../src/personal-content.js';
 import {prepareEmptyFixtureCollection,waitForContentReady} from './review-fixture-storage.mjs';
+import {goToPhotoPage,currentPhoto} from './review-photo-helpers.mjs';
 
 // Test content exists only in isolated browser contexts, never in personal-content.js.
 const base=process.env.REVIEW_URL||'http://127.0.0.1:5173/';
@@ -69,10 +70,9 @@ try{
     await page.locator('#memory-caption').fill(caption);await page.locator('#memory-alt').fill('自动检查的单像素图片');
     await page.locator('#memory-date').fill('2024-02-29');await submit(page,'memory');await saved(page,'memory','已放到白丝带上');
     assert.equal(await page.locator('#saved-memories .saved-item').count(),1);
-    await closeEditor();await openPlace('ribbon');await page.locator('.open-memory').nth(staticMemories.length).click();
+    await closeEditor();await openPlace('ribbon');await goToPhotoPage(page,staticMemories.length+1,staticMemories.length+1);
     assert.equal(await page.locator('.memory-reader figcaption').textContent(),caption+'2024-02-29');
-    assert.ok(await page.locator('.memory-reader img').evaluate(el=>el.complete&&el.naturalWidth===1));
-    await page.keyboard.press('Escape');assert.equal(await page.locator('.open-memory').count(),staticMemories.length+1);
+    assert.ok(await currentPhoto(page).evaluate(el=>el.complete&&el.naturalWidth===1));
     await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});
   });
   await check('Photo edit preserves image without reselecting a file',async()=>{

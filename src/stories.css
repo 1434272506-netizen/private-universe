@@ -5,18 +5,6 @@
 #letter-dialog .letter-content{margin-top:31px;margin-bottom:31px}
 #memory-content.has-memories{display:block;overflow:visible;min-width:0}
 .collection-note{display:flex;align-items:baseline;justify-content:space-between;gap:15px;margin:0 0 21px;font:12px/1.8 var(--chinese);color:var(--muted);letter-spacing:.06em}
-.collection-scroll-hint{font:10px/1.7 var(--sans);letter-spacing:.03em;color:#87907d;text-align:right}
-.memory-track{display:flex;align-items:flex-start;gap:27px;overflow-x:auto;overscroll-behavior-x:contain;padding:10px 7px 23px;scroll-snap-type:x mandatory;scrollbar-width:thin;scrollbar-color:#b7bda7 transparent}
-.memory-track .memory-card{flex:0 0 286px;min-width:0;align-self:flex-start;padding:11px 11px 17px;transform:rotate(-.7deg);background:#fffdf7;box-shadow:1px 4px 9px #3342320d,0 1px 2px #74674912;border:1px solid #e3deca65}
-.memory-track .memory-card:nth-child(even){transform:rotate(.8deg)}
-.memory-track .memory-card:has([data-orientation='portrait']){flex-basis:235px}
-.memory-track .memory-card figcaption{overflow-wrap:anywhere;white-space:pre-wrap;font:13px/1.9 var(--chinese);margin:15px 5px 0;letter-spacing:.015em}
-.memory-track .memory-card .story-date{margin:9px 5px 0;font-size:10px;letter-spacing:.04em;color:#7b8573}
-.memory-track .memory-card img{height:205px;object-fit:contain;background:#eeeee4}
-.memory-track .memory-card [data-orientation='portrait'] img{height:255px}
-.open-memory{display:block;width:100%;padding:0;border:0;background:transparent;text-align:inherit;transition:filter .2s}
-.open-memory:hover{filter:brightness(1.04)}
-.open-memory:focus-visible{outline-offset:5px;outline-width:1px}
 .story-photograph{width:100%;min-width:0;background:#edf0e4;overflow:hidden;box-shadow:inset 0 0 0 1px #88957712}
 .photo-unavailable{min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:25px 15px;color:var(--muted);font:14px/1.7 var(--chinese);border:1px dashed #9ba58a80}
 .photo-unavailable small{font:11px/1.7 var(--sans)}
@@ -33,6 +21,37 @@
 .story-date{font:11px/1.7 var(--sans);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
 .memory-reader .story-date{display:block;margin-top:9px}
 .story-pagination{display:flex;justify-content:space-between;gap:25px;margin-top:14px}
+/* One photograph per page. All page changes share the same available frame. */
+#memory-dialog:has(.is-paged-album){padding:24px 35px;overflow:hidden}
+#memory-dialog:has(.is-paged-album) .ribbon-surface{display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:0;width:min(940px,100%);height:min(960px,calc(100dvh - 48px));min-height:0;max-height:calc(100dvh - 48px);padding:31px 43px 20px}
+#memory-dialog:has(.is-paged-album) .story-heading{padding:0 24px 17px}
+#memory-dialog:has(.is-paged-album) .story-heading h2{font-size:23px;line-height:1.45;margin-top:9px}
+#memory-content.has-memories.is-paged-album{display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;align-items:stretch;gap:13px;min-height:0;min-width:0;overflow:hidden;padding:0 0 14px;scroll-snap-type:none}
+.album-toolbar{display:flex;align-items:baseline;justify-content:space-between;gap:16px;min-height:25px;padding:0 2px 6px;border-bottom:1px solid #b8b39840}
+.album-label{margin:0;color:var(--muted);font:11px/1.7 var(--chinese);letter-spacing:.06em}
+.album-toolbar .story-position{flex:none;letter-spacing:.08em}
+.album-stage{position:relative;isolation:isolate;min-width:0;min-height:0;overflow:hidden;touch-action:pan-y pinch-zoom}
+.album-page{position:absolute;inset:0;display:grid;grid-template-rows:minmax(0,1fr) auto;gap:12px;margin:0;min-width:0;min-height:0;will-change:transform,opacity}
+.album-page:has(.album-caption[hidden]){grid-template-rows:minmax(0,1fr);gap:0}
+.album-page .story-photograph{display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;height:100%;background:#eceee3;box-shadow:inset 0 0 0 1px #88957712}
+.album-page .story-photograph img{display:block;width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:50% 50%;user-select:none;-webkit-user-drag:none}
+.album-page .photo-unavailable{width:100%;height:100%;min-height:0;padding:20px;font-size:14px}
+.album-page .album-caption{min-width:0;min-height:0;max-height:min(96px,12dvh);margin:0;padding:0 3px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#b7bda7 transparent;font:14px/1.8 var(--chinese);letter-spacing:.015em;white-space:pre-wrap;overflow-wrap:anywhere;touch-action:pan-y}
+.album-caption>span{display:block}
+.album-page .album-caption .story-date{margin-top:5px;font-size:10px}
+.album-photo-status{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--muted);font:12px/1.8 var(--chinese);letter-spacing:.08em}
+.album-pagination{align-items:center;gap:15px;margin:0}
+.album-pagination .story-page-button{min-width:98px;min-height:44px;padding:10px 0;color:var(--ink);font-size:12px}
+.album-pagination .album-prev{text-align:left}
+.album-pagination .album-next{text-align:right}
+.album-pagination .story-page-button:disabled{color:var(--muted);opacity:.35;cursor:default}
+.album-pagination .story-page-button:focus-visible{outline-offset:2px}
+.album-page-hint{color:#818b78;font:10px/1.6 var(--sans);text-align:center;letter-spacing:.04em}
+.is-paged-album .story-original-tools{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:28px;margin:0 2px}
+.is-paged-album .story-original{font-size:10px;line-height:1.8}
+.is-paged-album .album-add{display:inline-flex;align-items:center;justify-content:center;min-height:28px;min-width:0;width:auto;margin:0;padding:3px 0;border:0;border-bottom:1px solid transparent;background:transparent;border-radius:0;color:var(--muted);font:10px/1.8 var(--chinese);letter-spacing:.04em}
+.is-paged-album .album-add:hover{color:var(--ink);border-bottom-color:var(--line)}
+#memory-dialog:has(.is-paged-album) .ribbon-footer{min-height:31px;padding-top:13px;font-size:10px}
 .envelope-list{display:grid;gap:19px}
 .letter-envelope{position:relative;display:flex;align-items:center;gap:20px;width:100%;min-width:0;min-height:121px;padding:24px 22px;border:1px solid #bcb49b73;background:linear-gradient(165deg,#fffdf5,#f2ecdb);text-align:left;box-shadow:1px 4px 8px #4b4e3810;transition:transform .2s,border-color .2s,box-shadow .2s}
 .letter-envelope::before{content:'';position:absolute;inset:6px;pointer-events:none;border:1px solid #c6bca12e}
@@ -60,14 +79,43 @@
   #memory-dialog .memory-content{padding-top:25px;padding-bottom:21px}
   #letter-dialog .letter-surface{padding-left:25px;padding-right:25px}
   .collection-note{align-items:flex-start;flex-direction:column;gap:3px;margin-bottom:16px}
-  .collection-scroll-hint{text-align:left;font-size:9px}
-  .memory-track{gap:20px;padding-left:6px;padding-right:6px}
-  .memory-track .memory-card,.memory-track .memory-card:has([data-orientation='portrait']){flex-basis:235px}
-  .memory-track .memory-card img{height:185px}
-  .memory-track .memory-card [data-orientation='portrait'] img{height:235px}
   .memory-reader img{max-height:48vh}.memory-reader figcaption{font-size:14px}
+  #memory-dialog:has(.is-paged-album){padding:12px 20px}
+  #memory-dialog:has(.is-paged-album) .ribbon-surface{height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);padding:27px 19px 17px}
+  #memory-dialog:has(.is-paged-album) .story-heading{padding:0 20px 15px}
+  #memory-dialog:has(.is-paged-album) .story-heading h2{font-size:20px;margin-top:8px;letter-spacing:.06em}
+  #memory-content.has-memories.is-paged-album{gap:10px;padding-bottom:11px}
+  .album-toolbar{min-height:24px;padding-bottom:5px}
+  .album-label{font-size:10px}
+  .album-toolbar .story-position{font-size:10px}
+  .album-page{gap:10px}
+  .album-page .album-caption{max-height:min(84px,12dvh);padding:0 1px;font-size:13px;line-height:1.8}
+  .album-page .story-photograph img{height:100%;max-height:100%}
+  .album-pagination{gap:8px}
+  .album-pagination .story-page-button{min-width:86px;min-height:44px;font-size:11px}
+  .album-page-hint{max-width:82px;font-size:9px;line-height:1.6}
+  .is-paged-album .story-original-tools{gap:12px;margin:0 1px}
+  .is-paged-album .album-add{min-height:30px}
+  #memory-dialog:has(.is-paged-album) .ribbon-footer{min-height:30px;padding-top:11px;font-size:9px;gap:8px}
   .letter-envelope{gap:13px;padding:20px 16px;min-height:108px}.envelope-title{font-size:15px}.letter-seal{flex-basis:18px;height:18px}
   .letter-seal::after{inset:5px}
   .single-letter{padding:0 1px}.single-letter h3{font-size:21px}.single-letter-body{font-size:14px;line-height:2.15}
   .story-reading-tools{gap:12px;margin-bottom:20px}
+}
+@media(max-height:740px) and (min-width:761px){
+  #memory-dialog:has(.is-paged-album){padding-top:15px;padding-bottom:15px}
+  #memory-dialog:has(.is-paged-album) .ribbon-surface{height:calc(100dvh - 30px);max-height:calc(100dvh - 30px);padding-top:24px;padding-bottom:15px}
+  #memory-dialog:has(.is-paged-album) .story-heading{padding-bottom:12px}
+  #memory-dialog:has(.is-paged-album) .story-heading h2{font-size:21px;margin-top:6px}
+  #memory-content.has-memories.is-paged-album{gap:9px;padding-bottom:10px}
+  .album-page .album-caption{max-height:68px;font-size:13px}
+  #memory-dialog:has(.is-paged-album) .ribbon-footer{padding-top:10px;min-height:28px}
+}
+@media(max-height:700px) and (max-width:760px){
+  #memory-dialog:has(.is-paged-album) .ribbon-surface{padding-top:24px;padding-bottom:13px}
+  #memory-dialog:has(.is-paged-album) .story-heading{padding-bottom:11px}
+  #memory-dialog:has(.is-paged-album) .story-heading h2{font-size:18px;margin-top:5px}
+  #memory-content.has-memories.is-paged-album{gap:7px;padding-bottom:8px}
+  .album-page .album-caption{max-height:68px;font-size:12px;line-height:1.75}
+  #memory-dialog:has(.is-paged-album) .ribbon-footer{padding-top:9px;min-height:26px}
 }

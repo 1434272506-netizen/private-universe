@@ -21,7 +21,7 @@ const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-per
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.type=THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate=false;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
@@ -97,6 +97,9 @@ let currentView='hero',flight=null,intro=null,savedView=null,pendingStory=null,a
 let shadowUntil=0,hintUntil=0,closing=false;
 let ribbonPresentation=null;
 let contentEditorOpen=false;
+let sceneFrameRequested=true,overlayRenderPaused=false,overlayReadyAt=0,stableCameraFrames=0,renderCount=0;
+const renderedPosition=camera.position.clone(),renderedTarget=controls.target.clone(),renderedRotation=camera.quaternion.clone();
+function requestSceneFrame(){sceneFrameRequested=true;}
 const ease=t=>t*t*t*(t*(t*6-15)+10);
 function announce(text){$('#announcement').textContent=text;}
 function setPhase(next){phase=next;app.dataset.phase=next;canvasUI.inert=next!=='exploring';}
@@ -175,6 +178,7 @@ function showStory(kind){
   surface.style.setProperty('--origin-x',`${50+point.x*45}%`);
   surface.style.setProperty('--origin-y',`${50-point.y*45}%`);
   activeDialog=dialog;controls.enabled=false;dialog.classList.remove('is-closing');dialog.showModal();
+  overlayReadyAt=performance.now()+(reducedMotion?0:kind==='ribbon'?1050:850);requestSceneFrame();
   if(kind==='ribbon')ribbonPresentation=presentRibbon(dialog,{x:(point.x*.5+.5)*innerWidth,y:(-.5*point.y+.5)*innerHeight},{reducedMotion});
   dialog.querySelector('.close-story').focus({preventScroll:true});
 }
@@ -202,8 +206,8 @@ async function closeStory(){
 prepareStories();
 prepareContentEditor({
   onChange:prepareStories,
-  onOpen:()=>{contentEditorOpen=true;closeHelp();hideHint();setTour(false);pendingStory=null;controls.enabled=false;},
-  onClose:()=>{contentEditorOpen=false;controls.enabled=phase==='exploring'&&!activeDialog;}
+  onOpen:()=>{contentEditorOpen=true;overlayReadyAt=performance.now();requestSceneFrame();closeHelp();hideHint();setTour(false);pendingStory=null;controls.enabled=false;},
+  onClose:()=>{contentEditorOpen=false;requestSceneFrame();controls.enabled=phase==='exploring'&&!activeDialog;}
 });
 for(const dialog of document.querySelectorAll('.story-dialog')){
   dialog.querySelector('.close-story').addEventListener('click',closeStory);
@@ -235,7 +239,7 @@ $('#fullscreen').addEventListener('click',async()=>{
   try{if(document.fullscreenElement)await document.exitFullscreen();else await app.requestFullscreen();}
   catch{announce('浏览器未能进入全屏，你仍可拖动浏览。');}
 });
-document.addEventListener('fullscreenchange',()=>$('#fullscreen').setAttribute('aria-label',document.fullscreenElement?'退出全屏':'进入全屏'));
+document.addEventListener('fullscreenchange',()=>{$('#fullscreen').setAttribute('aria-label',document.fullscreenElement?'退出全屏':'进入全屏');requestSceneFrame();});
 window.addEventListener('keydown',event=>{
   if(contentEditorOpen)return;
   if(event.target instanceof HTMLElement&&(/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable))return;
@@ -249,6 +253,8 @@ controls.addEventListener('start',()=>{
   flight=null;pendingStory=null;controls.enableDamping=true;setTour(false);hideHint();
   $('#explore-hint').classList.remove('is-visible');
 });
+controls.addEventListener('change',requestSceneFrame);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestSceneFrame();});
 
 // Direct picking uses the real meshes. A small screen-space tolerance makes
 // the delicate ribbon reachable without introducing permanent floating labels.
@@ -300,6 +306,13 @@ function animate(now){
   requestAnimationFrame(animate);
   const delta=Math.min((now-lastFrame)/1000,.06);lastFrame=now;
   if(document.hidden)return;
+  // Once reading covers a settled garden, keep the last frame rather than
+  // competing with photo decoding and page transitions for the GPU. Keep the
+  // scene clock still as well, so returning never jumps ahead through the wind.
+  const covered=Boolean(activeDialog?.open||contentEditorOpen);
+  overlayRenderPaused=ready&&covered&&!closing&&!flight&&!intro&&!pendingStory
+    &&performance.now()>=overlayReadyAt&&elapsed>=shadowUntil&&stableCameraFrames>=2&&!sceneFrameRequested;
+  if(overlayRenderPaused)return;
   elapsed+=delta;time.value=reducedMotion?0:elapsed;
   props.update(reducedMotion?0:elapsed);atmosphere.update?.(reducedMotion?0:elapsed);
   if(shadowUntil>elapsed)renderer.shadowMap.needsUpdate=true;
@@ -316,7 +329,13 @@ function animate(now){
   if(flight||intro)camera.lookAt(controls.target);else controls.update(delta);
   if(pendingStory&&elapsed>=pendingStory.at){const {kind}=pendingStory;pendingStory=null;showStory(kind);}
   if(hintUntil&&elapsed>hintUntil){hintUntil=0;$('#explore-hint').classList.remove('is-visible');}
+  const cameraStill=camera.position.distanceToSquared(renderedPosition)<1e-12
+    &&controls.target.distanceToSquared(renderedTarget)<1e-12
+    &&1-Math.abs(camera.quaternion.dot(renderedRotation))<1e-12;
+  stableCameraFrames=cameraStill?stableCameraFrames+1:0;
+  renderedPosition.copy(camera.position);renderedTarget.copy(controls.target);renderedRotation.copy(camera.quaternion);
   lighting.render(delta);
+  renderCount++;sceneFrameRequested=false;
   if(!ready){
     ready=true;document.documentElement.dataset.sceneReady='true';$('#loading').classList.add('is-ready');$('#enter').disabled=false;$('#enter-direct').hidden=false;
   }
@@ -326,16 +345,21 @@ renderer.shadowMap.needsUpdate=true;lastFrame=performance.now();requestAnimation
 renderer.domElement.addEventListener('webglcontextlost',event=>{
   event.preventDefault();const error=$('#scene-error');error.hidden=false;error.textContent='画面暂时中断了，请刷新页面重新打开花园。';
 });
+renderer.domElement.addEventListener('webglcontextrestored',()=>{
+  requestSceneFrame();renderer.shadowMap.needsUpdate=true;lastFrame=performance.now();$('#scene-error').hidden=true;
+});
 window.addEventListener('resize',()=>{
+  requestSceneFrame();
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
   lighting.resize(innerWidth,innerHeight);
   if(intro)intro.to=fitPosition('hero');
   if(currentView==='hero'&&!intro&&!activePlace)frame('hero');
 });
 motionQuery.addEventListener('change',event=>{
+  requestSceneFrame();
   reducedMotion=event.matches;
   $('#tour').hidden=reducedMotion;
   if(reducedMotion)props.setMailboxOpen(props.mailbox.userData.open,{immediate:true});
   if(reducedMotion){setTour(false);if(intro)finishIntro(false);if(flight){const f=flight;moveTo(f.to,f.toTarget,{duration:0,min:controls.minDistance,done:f.done});}}
 });
-if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;}};
+if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;},get overlayRenderPaused(){return overlayRenderPaused;},get renderCount(){return renderCount;},get sceneTime(){return elapsed;}};

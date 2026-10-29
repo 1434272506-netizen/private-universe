@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {providedPhotoImport} from '../src/personal-content.js';
 import {prepareEmptyFixtureCollection,waitForContentReady} from './review-fixture-storage.mjs';
+import {waitForPhotoPage,goToPhotoPage,currentPhoto} from './review-photo-helpers.mjs';
 
 // Only isolated browser profiles are changed. Source photographs are read-only.
 const base=process.env.REVIEW_URL||'http://127.0.0.1:5173/';
@@ -36,7 +37,6 @@ async function openRibbon(){
   await page.locator('#help-toggle').click();await page.locator('[data-place="ribbon"]').click();await page.locator('#memory-dialog').waitFor({state:'visible'});
 }
 async function closeRibbon(){
-  if(await page.locator('.memory-reader').count())await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});
 }
 async function readStored(target=page){
@@ -96,20 +96,19 @@ try{
     const records=await readStored();for(const record of records){assert.equal(record.sha256,expectedById.get(record.id).sha256);assert.equal(record.bytes,expectedById.get(record.id).bytes);}
   });
   await openRibbon();
-  await check('All thumbnail photos use complete natural dimensions and contain rendering without crop or stretch',async()=>{
-    assert.equal(await page.locator('.memory-card').count(),10);
-    for(let index=0;index<photos.length;index++){
-      const image=page.locator('.memory-card img').nth(index);await image.scrollIntoViewIfNeeded();await assertImage(image,photos[index],'desktop-thumbnail');
-    }
-    await page.locator('.memory-card').first().scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/ribbon-original-collection.png`});
+  await check('The album opens directly to one complete photo page without a thumbnail strip',async()=>{
+    await waitForPhotoPage(page,1,10);assert.equal(await page.locator('.album-page').count(),1);
+    assert.equal(await page.locator('.memory-card,.memory-track,.open-memory').count(),0);
+    await assertImage(currentPhoto(page),photos[0],'desktop-first-page');
+    await page.screenshot({path:`${out}/ribbon-original-collection.png`});
   });
   await check('Each detail preserves original dimensions and proportions, including the horizontal fifth image',async()=>{
-    await page.locator('.open-memory').first().click();
+    await goToPhotoPage(page,1,10);
     for(let index=0;index<photos.length;index++){
       assert.equal(await page.locator('.story-position').textContent(),`${index+1} / 10`);
-      await assertImage(page.locator('.memory-reader img'),photos[index],'desktop-detail');
+      await waitForPhotoPage(page,index+1,10);await assertImage(currentPhoto(page),photos[index],'desktop-page');
       if([1,4,7].includes(index))await page.screenshot({path:`${out}/original-photo-${String(index+1).padStart(2,'0')}-desktop.png`});
-      if(index<photos.length-1)await page.getByRole('button',{name:'下一张 →',exact:true}).click();
+      if(index<photos.length-1){await page.locator('.album-next').click();await waitForPhotoPage(page,index+2,10);}
     }
   });
   await check('Open-original link exposes the original image dimensions and identical original bytes',async()=>{
@@ -122,16 +121,13 @@ try{
     assert.equal(result.width,photos[9].width);assert.equal(result.height,photos[9].height);assert.equal(result.sha256,photos[9].sha256);
   });
   await closeRibbon();await page.setViewportSize({width:390,height:844});await openRibbon();
-  await check('390px thumbnail and detail views keep all 10 photographs complete without horizontal overflow',async()=>{
+  await check('390px pages keep all 10 photographs complete without horizontal overflow',async()=>{
+    await goToPhotoPage(page,1,10);
     for(let index=0;index<photos.length;index++){
-      const image=page.locator('.memory-card img').nth(index);await image.scrollIntoViewIfNeeded();await assertImage(image,photos[index],'mobile-thumbnail');
-    }
-    await page.locator('.open-memory').first().click();
-    for(let index=0;index<photos.length;index++){
-      await assertImage(page.locator('.memory-reader img'),photos[index],'mobile-detail');
+      await waitForPhotoPage(page,index+1,10);await assertImage(currentPhoto(page),photos[index],'mobile-page');
       assert.ok(await page.locator('#memory-dialog').evaluate(element=>element.scrollWidth<=element.clientWidth));
       if([1,4,7].includes(index))await page.screenshot({path:`${out}/original-photo-${String(index+1).padStart(2,'0')}-390.png`});
-      if(index<photos.length-1)await page.getByRole('button',{name:'下一张 →',exact:true}).click();
+      if(index<photos.length-1){await page.locator('.album-next').click();await waitForPhotoPage(page,index+2,10);}
     }
   });
   await closeRibbon();await page.setViewportSize({width:1600,height:1100});await reload();

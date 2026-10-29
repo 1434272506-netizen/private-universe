@@ -35,7 +35,7 @@ try{
   const original=await page.evaluate(()=>({position:window.__PU.camera.position.toArray(),target:window.__PU.controls.target.toArray()}));
   await check('Physical ribbon opens the memory scroll',async()=>{
     await clickObject('ribbon');await page.locator('#memory-dialog').waitFor({state:'visible',timeout:10000});await page.waitForTimeout(1000);
-    if(expectedMemories)assert.equal(await page.locator('.memory-card').count(),expectedMemories);
+    if(expectedMemories){await page.waitForFunction(()=>document.querySelector('#memory-content')?.getAttribute('aria-busy')!=='true');assert.equal(await page.locator('.album-page[data-current="true"]').count(),1);assert.equal(await page.locator('.story-position').textContent(),`1 / ${expectedMemories}`);}
     else assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
     assert.equal(await page.evaluate(()=>window.__PU.controls.enabled),false);
   });await capture('design-memory');

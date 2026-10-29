@@ -24,7 +24,7 @@ try{
   await check('Ribbon opens and closes through the accessible controls',async()=>{
     await page.locator('#help-toggle').click();await page.locator('[data-place="ribbon"]').click();
     await page.locator('#memory-dialog').waitFor({state:'visible'});
-    if(expectedMemories)assert.equal(await page.locator('.memory-card').count(),expectedMemories);
+    if(expectedMemories){await page.waitForFunction(()=>document.querySelector('#memory-content')?.getAttribute('aria-busy')!=='true');assert.equal(await page.locator('.album-page[data-current="true"]').count(),1);assert.equal(await page.locator('.story-position').textContent(),`1 / ${expectedMemories}`);}
     else assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
     await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});await page.waitForTimeout(1800);
   });
