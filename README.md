@@ -78,14 +78,14 @@ npm run preview -- --port 5174 --strictPort
 node scripts/smoke-production.mjs
 ```
 
-生产检查默认访问 `http://127.0.0.1:5174/`，记录在 `screenshots/production-review.json`。可通过 `BROWSER_PATH` 指定 Chromium 系浏览器路径，通过 `PREVIEW_URL` 或 `PRODUCTION_PREVIEW_URL` 改变对应检查地址。`scripts/review.mjs` 已转为当前完整检查的兼容入口。2026-10-28 本轮构建、19 项开发检查及 7 项生产检查通过，详细证据与限制见 `REPORT-2026-10-28-OVERALL-DESIGN.md`。
+生产检查默认访问 `http://127.0.0.1:5174/`，记录在 `screenshots/production-review.json`。可通过 `BROWSER_PATH` 指定 Chromium 系浏览器路径，通过 `PREVIEW_URL` 或 `PRODUCTION_PREVIEW_URL` 改变对应检查地址。`scripts/review.mjs` 已转为当前完整检查的兼容入口。2026-10-29 实施轮构建和 49 项检查通过（19 场景、9 阅读、14 新树、7 生产），详细证据与限制见 `REPORT-2026-10-29-TREE-IMPLEMENTATION.md`。
 
 ## 设计记录与当前边界
 
 - [网站完善指引](../网站完善指引.md) 汇总当前未完善功能、已确认设计、建议顺序、依赖和验收标准，供后续开发接手。
 - [GitHub 参考与借鉴计划](REFERENCES.md) 记录实际核实的 Napali 源码、固定版本、本轮采用的方法与后续研究顺序。
-- [第二轮开发记录](REPORT-2026-10-28-REFERENCE-REFINEMENT.md) 记录环境改进、阅读功能与本轮验证；此前报告保留其历史状态。
+- [最新母树实施报告](REPORT-2026-10-29-TREE-IMPLEMENTATION.md) 记录基线恢复、实际模型、接入与 49 项检查；[第二轮开发记录](REPORT-2026-10-28-REFERENCE-REFINEMENT.md) 保留此前环境与阅读功能的历史记录。
 - `DESIGN-SOURCE.md` 保存原始 V0.1 brief、来源和后续恢复记录；双方原文位于上一级 `对话恢复/总体设计-消息原文.json`。
 - `DESIGN.md` 区分总体设计已确认方向、当前实现和仍待完成的体验。旧报告保留其发生日期，仅反映当时状态。
 - 当前着重电脑上的全景、自然空间和隐藏入口。声音与音乐、登录身份、双人同步、共同在线标记、网页上传编辑，以及气球创建、接收者权限、放飞与档案流程尚未实现；不会将本地物件展示视为完整双人系统。
-- 场景是程序化近似，并非扫描资产或最终照片级写实成品。岩体、树冠、草叶、水面、云与薄瀑仍需美术深化；缓存阴影不能完全对应每一帧风动。构建可能仍提示 Three.js 主包体积，小窗口可用不代表已完成手机优化。
+- 母树为实际制作的 GLB，环境仍有程序化近似。岩体、树冠、草叶、水面、云与薄瀑可继续美术深化；缓存阴影不能完全对应每一帧风动。构建仍有渲染模块体积提示，窄屏可用不代表手机真机验收。
