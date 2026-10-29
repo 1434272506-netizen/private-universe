@@ -6,45 +6,49 @@ import {makeBanyan} from './banyan.js';
 
 // A little less lawn, a little more meadow: plants share patches of habitat,
 // while the places people would sit, cross and walk remain softly open.
-export function makePlants(parent,time){
+export function makePlants(parent,time,{includeTree=true}={}){
   const random=rng(9284),dummy=new THREE.Object3D(),color=new THREE.Color();
-  const tree=makeBanyan(parent,time);
-  const blade=new THREE.BufferGeometry();
-  blade.setAttribute('position',new THREE.Float32BufferAttribute([
-    -.014,0,0,.014,0,0,-.011,.055,.009,.011,.055,.009,
-    -.006,.115,.039,.006,.115,.039,.013,.17,.088
-  ],3));
-  blade.setAttribute('uv',new THREE.Float32BufferAttribute([0,0,1,0,0,.3,1,.3,0,.65,1,.65,.5,1],2));
-  blade.setIndex([0,1,2,1,3,2,2,3,4,3,5,4,4,5,6]);
-  blade.computeVertexNormals();
-  const grassMat=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:1,side:THREE.DoubleSide});
+  const tree=includeTree?makeBanyan(parent,time):{};
+  const blade=meadowTuft();
+  const grassMat=new THREE.MeshStandardMaterial({color:'#ffffff',roughness:.94,side:THREE.DoubleSide});
   grassMat.onBeforeCompile=shader=>{
-    addWind(shader,time,.024);
+    addWind(shader,time,.018,.34);
     shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying float vBladeHeight;')
       .replace('#include <begin_vertex>','#include <begin_vertex>\nvBladeHeight=uv.y;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float vBladeHeight;')
-      .replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=mix(vec3(.61,.71,.53),vec3(1.0,1.01,.90),vBladeHeight);');
+      .replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=mix(vec3(.67,.76,.57),vec3(1.0,1.01,.90),vBladeHeight);')
+      .replace('#include <opaque_fragment>',`// Soft transmitted light keeps thin grass legible in its own shade.
+        outgoingLight+=diffuseColor.rgb*vec3(.050,.065,.028)*(.35+.65*vBladeHeight);
+        #include <opaque_fragment>
+      `);
   };
-  const grass=new THREE.InstancedMesh(blade,grassMat,59000);
-  const shadeGrass=new THREE.Color('#3c603c'),meadowGrass=new THREE.Color('#6e8952'),dryGrass=new THREE.Color('#8b945f');
+  const grass=new THREE.InstancedMesh(blade,grassMat,25000);
+  const shadeGrass=new THREE.Color('#4b6f40'),meadowGrass=new THREE.Color('#7b9559'),dryGrass=new THREE.Color('#8b945f');
   let gi=0;
-  for(let attempt=0;attempt<137000&&gi<grass.count;attempt++){
+  for(let attempt=0;attempt<100000&&gi<grass.count;attempt++){
     const x=(random()-.5)*RX*2.2,z=(random()-.5)*RZ*2.2;
     if(!inside(x,z,.996)||Math.abs(x-creekX(z))<creekWidth(z)+.20)continue;
     const patch=fbm(x*.57+9,z*.57),smallPatch=fbm(x*2.15+5,z*2.15-3),path=walkway(x,z),root=Math.hypot(x+4.1,z+.6);
     const seat=Math.hypot(x-4.2,(z-1.5)*1.2);
     if(root<.56||seat<.63)continue;
+    // Independently authored habitat rule: the local height gradient suppresses
+    // tall grass on steep banks, while smooth ground supports loose clumps.
+    const sample=.16,dx=(ground(x+sample,z)-ground(x-sample,z))/(sample*2),dz=(ground(x,z+sample)-ground(x,z-sample))/(sample*2);
+    const slope=Math.hypot(dx,dz),levelMeadow=1-THREE.MathUtils.smoothstep(slope,.22,.78);
+    const creekDistance=Math.abs(x-creekX(z))-creekWidth(z),bankMeadow=THREE.MathUtils.smoothstep(creekDistance,.20,.90);
     const openPath=THREE.MathUtils.smoothstep(path,.10,.65),rootMeadow=THREE.MathUtils.smoothstep(root,.65,2.05);
-    let density=(.26+THREE.MathUtils.smoothstep(patch,.28,.70)*.64)*(.56+smallPatch*.54);
+    let density=(.34+THREE.MathUtils.smoothstep(patch,.28,.70)*.59)*(.57+smallPatch*.56);
     density*=THREE.MathUtils.lerp(.42,1,openPath)*THREE.MathUtils.lerp(.48,1,rootMeadow);
+    density*=THREE.MathUtils.lerp(.46,1,levelMeadow);
     if(random()>density)continue;
     const edge=THREE.MathUtils.smoothstep(Math.abs(x-creekX(z)),creekWidth(z)+.2,creekWidth(z)+.8);
     const tuft=THREE.MathUtils.smoothstep(smallPatch,.40,.72);
-    let height=(.20+Math.pow(random(),.8)*.70)*(.58+tuft*.60);
+    let height=(.34+Math.pow(random(),.8)*.54)*(.71+tuft*.48);
     height*=THREE.MathUtils.lerp(.37,1,openPath)*THREE.MathUtils.lerp(.58,1,rootMeadow);
-    dummy.position.set(x,ground(x,z)-.013,z);
-    dummy.rotation.set((random()-.5)*.25,random()*Math.PI*2,(random()-.5)*.27);
-    dummy.scale.set(.58+random()*.68,height,height);
+    height*=THREE.MathUtils.lerp(.42,1,levelMeadow)*THREE.MathUtils.lerp(.56,1,bankMeadow);
+    dummy.position.set(x,ground(x,z)-.008,z);
+    dummy.rotation.set((random()-.5)*.14,random()*Math.PI*2,(random()-.5)*.14);
+    const spread=.76+random()*.48;dummy.scale.set(spread,height,spread);
     dummy.updateMatrix();grass.setMatrixAt(gi,dummy.matrix);
     color.copy(shadeGrass).lerp(meadowGrass,.28+patch*.55+random()*.15);
     color.multiplyScalar(.86+random()*.25);
@@ -118,7 +122,32 @@ export function makePlants(parent,time){
   }
   lavender.count=sprigs.count=li;lavender.receiveShadow=sprigs.receiveShadow=true;
   lavender.name='lavender-meadow-patches';sprigs.name='lavender-stems';parent.add(lavender,sprigs);
-  return {...tree,grass:gi,flowers:fi,lavender:li};
+  return {...tree,grass:gi*3,grassClumps:gi,flowers:fi,lavender:li};
+}
+
+// Three slim, differently curved leaves share one instanced clump. Five bends
+// replace the old broad triangular silhouette without adding a material draw.
+function meadowTuft(){
+  const parts=[];
+  for(let blade=0;blade<3;blade++){
+    const angle=blade*2.22+.2,height=[.31,.25,.35][blade],lean=[.12,.10,.145][blade];
+    const sx=Math.cos(angle),sz=-Math.sin(angle),lx=Math.sin(angle),lz=Math.cos(angle);
+    const vertices=[],uv=[],indices=[],segments=5;
+    for(let j=0;j<segments;j++){
+      const t=j/segments,curve=Math.pow(t,1.85)*lean;
+      const halfWidth=.0065*Math.pow(1-t,.78)*(1+.12*Math.sin(t*Math.PI));
+      for(const side of [-1,1]){
+        vertices.push(lx*(curve+blade*.007)+sx*halfWidth*side,height*t*(1-.10*t),lz*(curve+blade*.007)+sz*halfWidth*side);
+        uv.push((side+1)*.5,t);
+      }
+    }
+    vertices.push(lx*(lean+blade*.007),height*.9,lz*(lean+blade*.007));uv.push(.5,1);
+    for(let j=0;j<segments-1;j++){const a=j*2;indices.push(a,a+1,a+2,a+1,a+3,a+2);}
+    const last=(segments-1)*2;indices.push(last,last+1,segments*2);
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));geometry.setIndex(indices);geometry.computeVertexNormals();parts.push(geometry);
+  }
+  const geometry=mergeGeometries(parts,false);parts.forEach(part=>part.dispose());return geometry;
 }
 
 function walkway(x,z){
@@ -131,8 +160,8 @@ function walkway(x,z){
   return distance;
 }
 
-function addWind(shader,time,strength){
+function addWind(shader,time,strength,height=.24){
   shader.uniforms.uTime=time;
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform float uTime;')
-    .replace('#include <begin_vertex>',`#include <begin_vertex>\n#ifdef USE_INSTANCING\nvec3 origin=instanceMatrix[3].xyz;float windHeight=clamp(position.y/.24,0.,1.);transformed.x+=sin(uTime*1.05+origin.x*.8+origin.z*.6)*${strength}*windHeight;transformed.z+=sin(uTime*.77+origin.z*.83)*${strength*.4}*windHeight;\n#endif`);
+    .replace('#include <begin_vertex>',`#include <begin_vertex>\n#ifdef USE_INSTANCING\nvec3 origin=instanceMatrix[3].xyz;float windHeight=clamp(position.y/${height},0.,1.);windHeight*=windHeight;transformed.x+=sin(uTime*1.05+origin.x*.8+origin.z*.6)*${strength}*windHeight;transformed.z+=sin(uTime*.77+origin.z*.83)*${strength*.4}*windHeight;\n#endif`);
 }

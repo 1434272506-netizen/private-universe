@@ -6,6 +6,7 @@ import {makeWater} from './water.js';
 import {makeProps} from './props.js';
 import {makeAtmosphere} from './atmosphere.js';
 import {prepareStories} from '../stories.js';
+import {makeLighting} from './lighting.js';
 
 const $=selector=>document.querySelector(selector);
 const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
@@ -41,12 +42,14 @@ const fill=new THREE.DirectionalLight('#d3e3ed',.40);fill.position.set(6,3,-8);s
 
 const island=makeLand(scene);
 const statistics=makePlants(island,time),waterStatistics=makeWater(island,time),props=makeProps(island,time);
-for(const [x,y,z,scale] of [[-27,-4,-50,.19],[32,-8,-68,.14]]){
+for(const [x,y,z,scale] of [[-34,-20,-50,.32],[21,-24,-68,.25]]){
   const distant=makeLand(scene,{detail:'distant'});distant.name='distant-island';
   distant.scale.setScalar(scale);distant.position.set(x,y,z);
   distant.traverse(object=>{if(object.isMesh){object.castShadow=false;object.receiveShadow=false;}});
 }
 scene.updateMatrixWorld(true);
+const lighting=makeLighting(renderer,scene,camera);
+lighting.resize(innerWidth,innerHeight);
 
 // Fit the actual 3D silhouette, including instanced foliage, from every overview.
 const points=[],temp=new THREE.Vector3(),matrix=new THREE.Matrix4();
@@ -289,7 +292,7 @@ function animate(now){
   if(flight||intro)camera.lookAt(controls.target);else controls.update(delta);
   if(pendingStory&&elapsed>=pendingStory.at){const {kind}=pendingStory;pendingStory=null;showStory(kind);}
   if(hintUntil&&elapsed>hintUntil){hintUntil=0;$('#explore-hint').classList.remove('is-visible');}
-  renderer.render(scene,camera);
+  lighting.render(delta);
   if(!ready){
     ready=true;document.documentElement.dataset.sceneReady='true';$('#loading').classList.add('is-ready');$('#enter').disabled=false;$('#enter-direct').hidden=false;
   }
@@ -301,6 +304,7 @@ renderer.domElement.addEventListener('webglcontextlost',event=>{
 });
 window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+  lighting.resize(innerWidth,innerHeight);
   if(intro)intro.to=fitPosition('hero');
   if(currentView==='hero'&&!intro&&!activePlace)frame('hero');
 });

@@ -7,14 +7,16 @@ import {creekX, waterY, creekWidth, WATER_END, ground, inside} from './land.js';
 export function makeWater(parent, time) {
   let start = -4.8;
   while (!inside(creekX(start), start, .995)) start += .01;
-  const positions = [], uvs = [], indices = [], rows = 180, columns = 12;
+  const positions = [], uvs = [], depths = [], indices = [], rows = 180, columns = 18;
   for (let j = 0; j <= rows; j++) {
     const z = start + (WATER_END - start) * j / rows;
     const halfWidth = creekWidth(z);
     for (let i = 0; i <= columns; i++) {
       const u = i / columns;
       const width = halfWidth * 2 + .045 * Math.sin(z * 13) + .02 * Math.cos(z * 27);
-      positions.push(creekX(z) + (u - .5) * width, waterY(z), z);
+      const x = creekX(z) + (u - .5) * width;
+      positions.push(x, waterY(z), z);
+      depths.push(Math.max(0, waterY(z) - ground(x, z)));
       uvs.push(u, z);
     }
   }
@@ -22,7 +24,9 @@ export function makeWater(parent, time) {
     const a = j * (columns + 1) + i, b = a + columns + 1;
     indices.push(a, b, a + 1, a + 1, b, b + 1);
   }
-  const surface = mesh(parent, geometry(positions, uvs, indices), currentMaterial(time));
+  const creekGeometry = geometry(positions, uvs, indices);
+  creekGeometry.setAttribute('waterDepth', new THREE.Float32BufferAttribute(depths, 1));
+  const surface = mesh(parent, creekGeometry, currentMaterial(time));
   surface.name = 'creek-surface';
   surface.castShadow = false;
   surface.renderOrder = 2;
@@ -76,20 +80,21 @@ export function makeWater(parent, time) {
 
 function currentMaterial(time) {
   const water = new THREE.MeshPhysicalMaterial({
-    color: '#71aaa7', metalness: 0, roughness: .145, ior: 1.333,
-    transparent: true, opacity: .74, envMapIntensity: 1.65,
-    clearcoat: .78, clearcoatRoughness: .15,
+    color: '#ffffff', metalness: 0, roughness: .17, ior: 1.333,
+    transparent: true, opacity: 1, envMapIntensity: 1.15,
+    clearcoat: .38, clearcoatRoughness: .17,
     side: THREE.DoubleSide, depthWrite: false,
   });
   water.onBeforeCompile = shader => {
     shader.uniforms.uTime = time;
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vCurrentUv;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCurrentUv = uv;');
+      .replace('#include <common>', '#include <common>\nattribute float waterDepth;varying float vWaterDepth;varying vec2 vCurrentUv;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCurrentUv = uv;vWaterDepth=waterDepth;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uTime;
 varying vec2 vCurrentUv;
+varying float vWaterDepth;
 float currentHeight(vec2 p) {
   float flow = p.y - uTime * .24;
   return .0060 * sin(flow * 15.0 + sin(p.x * 8.0 + flow * 2.0))
@@ -103,10 +108,20 @@ float bankFoam = (1.0 - smoothstep(.008, .065, edgeDistance))
                * smoothstep(.15, .98, .5 + .5 * smallCurrent) * .18;
 float reflectiveThread = pow(.5 + .5 * sin(vCurrentUv.y * 12.0 - uTime * 2.1
   + sin(vCurrentUv.x * 11.0 + vCurrentUv.y * 2.0)), 12.0);
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(.58, .72, .69), bankFoam);
-diffuseColor.rgb *= .94 + .10 * reflectiveThread;
-// A softer edge exposes the shallows while the centre retains its cool tint.
-diffuseColor.a *= .78 + .22 * smoothstep(.015, .20, edgeDistance);`)
+// Independently adapted from napali's water-column attenuation principle;
+// the garden uses its actual shallow creek bed, in local scene units.
+float normalView=max(abs(dot(normalize(vNormal),normalize(vViewPosition))),.28);
+float opticalDepth=vWaterDepth/normalView;
+float absorption=1.0-exp(-opticalDepth*3.6);
+float deepening=1.0-exp(-vWaterDepth*6.0);
+diffuseColor.rgb=mix(vec3(.31,.48,.40),vec3(.065,.24,.235),deepening);
+diffuseColor.rgb=mix(diffuseColor.rgb,vec3(.58,.72,.69),bankFoam*.5);
+diffuseColor.rgb*=.98+.035*reflectiveThread;
+// Three's physical material supplies Fresnel lighting; alpha only represents
+// absorption through the water, with a small reflection floor at grazing angles.
+float fresnel=.0204+.9796*pow(1.0-normalView,5.0);
+diffuseColor.a=clamp(.08+absorption*.55+fresnel*.20,.08,.78)
+  *smoothstep(.0,.024,vWaterDepth);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
 // Derivatives convert a world-scale height to a camera-independent normal.
 float rippleHeight = currentHeight(vec2(vCurrentUv.x * 1.1, vCurrentUv.y));
