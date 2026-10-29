@@ -1,7 +1,10 @@
 node_modules/
+.npm-cache/
+__pycache__/
 dist/
 work/
 .history/
+/preview-v0.1.png
 screenshots/*
 !screenshots/mother_tree_*.jpg
 *.log

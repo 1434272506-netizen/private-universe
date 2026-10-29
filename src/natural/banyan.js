@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {addRibbon} from './ribbon.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {rng,mesh,curveTube,fbm} from './shared.js';
 import {ground} from './land.js';
@@ -97,7 +98,8 @@ export function makeBanyan(parent,time){
   leaf.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,-.023,.025,.002,-.039,.059,.005,-.030,.095,.004,0,.132,0,.030,.095,.004,.039,.059,.005,.023,.025,.002,0,.062,.011],3));
   leaf.setAttribute('uv',new THREE.Float32BufferAttribute([.5,0,.18,.19,0,.45,.12,.72,.5,1,.88,.72,1,.45,.82,.19,.5,.47],2));
   const ids=[];for(let i=0;i<8;i++)ids.push(8,i,(i+1)%8);leaf.setIndex(ids);leaf.computeVertexNormals();
-  const leafMat=new THREE.MeshStandardMaterial({color:'#ffffff',map:leafVeins(),roughness:.88,side:THREE.DoubleSide});
+  const leafMat=new THREE.MeshStandardMaterial({color:'#ffffff',map:leafVeins(),roughness:.88,side:THREE.DoubleSide});
+
   leafMat.onBeforeCompile=s=>{
     s.uniforms.uTime=time;
     s.vertexShader=s.vertexShader.replace('#include <common>','#include <common>\nuniform float uTime;varying float vLeafHeight;')
@@ -157,46 +159,6 @@ function buttress(x,z,a,length,base){
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(v,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();return g;
 }
 
-function addRibbon(parent,x,y,z,time){
-  const pieces=[];
-  const strip=(points,width,lengthwiseFlex=1)=>{
-    const curve=new THREE.CatmullRomCurve3(points.map(p=>new THREE.Vector3(...p)));
-    const vertices=[],uv=[],flex=[],ids=[],steps=36;
-    for(let j=0;j<=steps;j++){
-      const t=j/steps,p=curve.getPoint(t),tangent=curve.getTangent(t);
-      const cross=new THREE.Vector3(-tangent.y,tangent.x,.12*Math.sin(t*5)).normalize();
-      const w=width*(.92+.08*Math.sin(t*8));
-      for(const side of [-1,1]){
-        vertices.push(p.x+cross.x*w*side*.5,p.y+cross.y*w*side*.5,p.z+cross.z*w*side*.5);
-        uv.push((side+1)*.5,t);flex.push(t*t*lengthwiseFlex);
-      }
-    }
-    for(let j=0;j<steps;j++){const a=j*2;ids.push(a,a+1,a+2,a+1,a+3,a+2);}
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));
-    g.setAttribute('uv',new THREE.Float32BufferAttribute(uv,2));g.setAttribute('silkFlex',new THREE.Float32BufferAttribute(flex,1));
-    g.setIndex(ids);g.computeVertexNormals();pieces.push(g);
-  };
-  strip([[0,0,.04],[-.14,.14,.08],[-.30,.09,.05],[-.21,-.04,.06],[0,-.015,.05]],.07,.08);
-  strip([[0,0,.05],[.15,.13,.10],[.28,.07,.08],[.19,-.06,.06],[0,-.015,.05]],.07,.08);
-  strip([[-.025,-.015,.06],[-.10,-.30,.10],[-.04,-.61,.16],[-.16,-1.04,.22]],.105,1);
-  strip([[.025,-.015,.065],[.14,-.25,.10],[.12,-.53,.18],[.22,-.82,.20]],.09,.8);
-  const knot=new THREE.SphereGeometry(1,12,8);knot.scale(.061,.045,.036);knot.translate(0,-.015,.07);
-  knot.setAttribute('silkFlex',new THREE.Float32BufferAttribute(new Float32Array(knot.attributes.position.count),1));pieces.push(knot);
-  const geometry=mergeGeometries(pieces,false);pieces.forEach(g=>g.dispose());
-  const silk=new THREE.MeshPhysicalMaterial({color:'#faf9f0',roughness:.63,metalness:0,sheen:.30,sheenRoughness:.85,sheenColor:'#fff9eb',side:THREE.DoubleSide});
-  silk.onBeforeCompile=shader=>{
-    shader.uniforms.uTime=time;
-    shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform float uTime;attribute float silkFlex;')
-      .replace('#include <begin_vertex>',`#include <begin_vertex>
-        transformed.x+=sin(uTime*.85+position.y*2.)*.055*silkFlex;
-        transformed.z+=sin(uTime*1.07+position.y*2.4)*.045*silkFlex;
-      `);
-  };
-  silk.customProgramCacheKey=()=> 'branch-silk-ribbon-v1';
-  const ribbon=mesh(parent,geometry,silk,x,y,z);ribbon.name='memory-ribbon';
-  ribbon.castShadow=false;ribbon.userData.interaction='ribbon';
-  return ribbon;
-}
 
 function leafVeins(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=128;const ctx=canvas.getContext('2d');
@@ -204,4 +166,4 @@ function leafVeins(){
   ctx.strokeStyle='rgba(242,244,220,.44)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(64,0);ctx.lineTo(64,128);ctx.stroke();
   for(let i=0;i<7;i++){let y=15+i*15;for(let sign of [-1,1]){ctx.beginPath();ctx.moveTo(64,y);ctx.quadraticCurveTo(64+sign*15,y+12,64+sign*55,y+26);ctx.stroke();}}
   const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.anisotropy=4;return texture;
-}
+}

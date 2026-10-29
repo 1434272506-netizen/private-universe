@@ -11,7 +11,7 @@ class GardenContactPass extends GTAOPass {
     super._overrideVisibility();
     this.scene.traverse(object => {
       const material = object.material;
-      if (object.visible && (object.isSprite || object.name === 'spring-sky'
+      if (object.visible && (object.userData.gardenFoliage || object.isSprite || object.name === 'spring-sky'
         || object.name === 'patches-of-meadow-grass' || object.name === 'banyan-canopy'
         || material?.transparent)) {
         object.visible = false;

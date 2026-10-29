@@ -7,6 +7,7 @@ import {makeProps} from './props.js';
 import {makeAtmosphere} from './atmosphere.js';
 import {prepareStories} from '../stories.js';
 import {makeLighting} from './lighting.js';
+import {loadCenterpieceTree} from './loveTree.js';
 
 const $=selector=>document.querySelector(selector);
 const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
@@ -41,7 +42,10 @@ scene.add(sun);
 const fill=new THREE.DirectionalLight('#d3e3ed',.40);fill.position.set(6,3,-8);scene.add(fill);
 
 const island=makeLand(scene);
-const statistics=makePlants(island,time),waterStatistics=makeWater(island,time),props=makeProps(island,time);
+$('#loading').textContent='春风经过树梢，花园就快醒来了。';
+const treeAsset=await loadCenterpieceTree(island,time);
+const statistics={...makePlants(island,time,{includeTree:false}),...treeAsset.statistics};
+const waterStatistics=makeWater(island,time),props=makeProps(island,time);
 for(const [x,y,z,scale] of [[-34,-20,-50,.32],[21,-24,-68,.25]]){
   const distant=makeLand(scene,{detail:'distant'});distant.name='distant-island';
   distant.scale.setScalar(scale);distant.position.set(x,y,z);
@@ -64,8 +68,12 @@ island.traverse(object=>{
     temp.fromBufferAttribute(positions,i).applyMatrix4(object.matrixWorld);points.push(temp.clone());
   }
 });
-const target=new THREE.Vector3(0,.35,0);
-const directions={hero:[.12,.59,.80],side:[.94,.24,.25],overhead:[.15,.94,.31],opposite:[-.18,.53,-.86]};
+// Authored foliage can extend beyond the sparse vertex samples used above.
+for(const x of [treeAsset.bounds.min.x,treeAsset.bounds.max.x])
+  for(const y of [treeAsset.bounds.min.y,treeAsset.bounds.max.y])
+    for(const z of [treeAsset.bounds.min.z,treeAsset.bounds.max.z])points.push(new THREE.Vector3(x,y,z));
+const target=new THREE.Vector3(-.4,1.7,0);
+const directions={hero:[.12,.35,.93],side:[.94,.24,.25],overhead:[.15,.94,.31],opposite:[-.18,.53,-.86]};
 const ribbon=island.getObjectByName('memory-ribbon');
 const anchors={
   ribbon:new THREE.Vector3(...(statistics.ribbonAnchor||[-2.64,3.49,.69])),
@@ -78,6 +86,10 @@ const presets={
   bench:{target:[-3.6,.8,-2.6],position:[4.2,ground(4.2,1.5)+1.28,2.7],min:7,title:'坐一会儿，春天还很长。',note:'Stay a little longer.'},
   creek:{target:[1.65,.65,.9],position:[10.7,7.6,13.2],min:8,title:'溪水经过。',note:'Let the afternoon flow.'}
 };
+const treeWidth=treeAsset.bounds.getSize(new THREE.Vector3()).x;
+const ribbonTarget=anchors.ribbon.clone().add(new THREE.Vector3(-.15,-.08,0));
+const treeViewOffset=new THREE.Vector3(.32,.12,.94).normalize().multiplyScalar(THREE.MathUtils.clamp(treeWidth*.78,7.8,10.5));
+Object.assign(presets.tree,{target:ribbonTarget.toArray(),position:ribbonTarget.clone().add(treeViewOffset).toArray(),min:6.8});
 let elapsed=0,lastFrame=performance.now(),ready=false,phase='invitation';
 let currentView='hero',flight=null,intro=null,savedView=null,pendingStory=null,activePlace=null,activeDialog=null;
 let shadowUntil=0,hintUntil=0,closing=false;
@@ -230,7 +242,7 @@ controls.addEventListener('start',()=>{
 // the delicate ribbon reachable without introducing permanent floating labels.
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
 const interactive=[ribbon,props.mailbox,props.bench].filter(Boolean);
-const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),island.getObjectByName('banyan-trunk-and-roots')].filter(Boolean);
+const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),...treeAsset.trunkMeshes].filter(Boolean);
 function pick(clientX,clientY){
   if(phase!=='exploring'||activeDialog||flight||intro)return null;
   mouse.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
@@ -314,4 +326,4 @@ motionQuery.addEventListener('change',event=>{
   if(reducedMotion)props.setMailboxOpen(props.mailbox.userData.open,{immediate:true});
   if(reducedMotion){setTour(false);if(intro)finishIntro(false);if(flight){const f=flight;moveTo(f.to,f.toTarget,{duration:0,min:controls.minDistance,done:f.done});}}
 });
-if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,discover,enter,returnToGarden,get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;}};
+if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;}};

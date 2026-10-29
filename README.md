@@ -1,6 +1,12 @@
 # PRIVATE UNIVERSE
 
-给两个人的私人春日花园。PC 展示优先，以 Vite + JavaScript + Three.js 实时渲染，可环绕观察、靠近物件并发现隐藏入口。当前为 2026-10-28 第二轮开发版本：借鉴 Napali 的水深和植被分布方法，完善草叶、接触阴影与远景，同时加入照片大图和逐封信件阅读。场景仍采用程序化几何与材质。
+给两个人的私人春日花园。PC 展示优先，以 Vite + JavaScript + Three.js 实时渲染，可环绕观察、靠近物件并发现隐藏入口。2026-10-29 已恢复误回退的水深、植被、接触阴影和远景精修，并接入 Blender/MTree 实际制作的中心母树 GLB；保留照片大图和逐封信件阅读。
+
+## 中心母树
+
+实际模型为 `public/models/love-tree.glb`，包含连续融合的枝干与板根、宽冠叶幕、真实树皮/透明橡叶贴图和 `RibbonAnchor` 挂点。丝带、相机近景与遮挡注册在模型加载后初始化；加载失败时显示“重新打开”，不会提前进入未完成的场景。
+
+模型约 68,000 三角面、7.55 MB。制作源代码、重建步骤和纹理在 [scripts/authoring](scripts/authoring/README.md)，来源许可在 [模型许可说明](public/models/love-tree-LICENSES.md)。`mother_tree_*.jpg` 为 AI 概念参考，当前真实效果请看浏览器或最新实机截图。
 
 ## 启动
 
@@ -52,6 +58,8 @@ npm run build
 node scripts/review-overall-design.mjs
 node scripts/review-stories.mjs
 ```
+
+也可在开发服务运行时执行 `npm test`，依次运行场景、阅读和新树专用检查；`npm run test:tree` 单独验证 GLB、尺寸、挂点、遮挡、GTAO、实体点击及加载失败重试。新树检查记录在 `work/qa/love-tree/`。
 
 该脚本使用本机 Edge 与 Playwright，检查邀请页、可跳过开场、场景物件点击、阅读层与空状态、返回镜头、拖动和点击的区分、长椅视角、缩放边界、减少动态效果及多视角渲染。结果写入 `screenshots/overall-design-review.json`，截图为 `screenshots/design-*.png`。
 
