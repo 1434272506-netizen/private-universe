@@ -26,6 +26,7 @@
     <div id="garden-ui" inert>
       <header class="masthead"><span>Private Universe<span class="brand-dot">.</span></span><span class="brand-note">一隅春天</span></header>
       <div class="top-actions" aria-label="花园选项">
+        <button class="add-content-button" id="add-content" type="button" aria-haspopup="dialog" aria-controls="content-dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>收藏一段</button>
         <button class="icon-button" id="help-toggle" type="button" aria-label="查看操作说明" aria-expanded="false" aria-controls="help-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.3 1.8-2.3 3.6M12 16.6h.01"/></svg></button>
         <button class="icon-button" id="fullscreen" type="button" aria-label="进入全屏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4H4v4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"/></svg></button>
       </div>
@@ -60,6 +61,42 @@
         <header class="story-heading"><span class="tiny-label">LETTERS BETWEEN US</span><h2 id="letter-title">寄给彼此的春天</h2></header>
         <div id="letter-content" class="letter-content"></div>
         <footer class="letter-footer"><span class="identity-mark purple" aria-hidden="true"></span><span>一封一封，慢慢读。</span><span class="identity-mark green" aria-hidden="true"></span></footer>
+      </section>
+    </dialog>
+    <dialog id="content-dialog" class="content-dialog" aria-labelledby="editor-title">
+      <section class="editor-surface">
+        <button id="close-editor" class="editor-close icon-button" type="button" aria-label="回到花园"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <header class="editor-heading"><span class="tiny-label">A LITTLE MORE OF US</span><h2 id="editor-title">把这一刻，留在这里。</h2><p class="editor-intro">一张照片，或一封想慢慢读的信。</p></header>
+        <nav class="editor-tabs" role="tablist" aria-label="选择添加的内容">
+          <button id="photo-tab" class="editor-tab" type="button" role="tab" aria-selected="true" aria-controls="photo-panel">收藏照片</button>
+          <button id="letter-tab" class="editor-tab" type="button" role="tab" aria-selected="false" aria-controls="letter-panel" tabindex="-1">写一封信</button>
+        </nav>
+        <section id="photo-panel" class="editor-panel" role="tabpanel" aria-labelledby="photo-tab">
+          <div class="editor-columns">
+            <form id="memory-form" class="editor-form">
+              <label class="field photo-picker"><span>选一张照片</span><div id="photo-preview" class="photo-preview"><span>让回忆有个位置</span></div><input id="memory-file" name="file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/avif" required><small>JPG、PNG、WebP、GIF 或 AVIF，单张不超过 20 MB</small></label>
+              <label class="field"><span>想记下的话 <small>可留空</small></span><textarea id="memory-caption" name="caption" rows="3" maxlength="2000" placeholder="这一刻，有什么想留给以后的我们？"></textarea></label>
+              <div class="field-row"><label class="field"><span>那一天 <small>可留空</small></span><input id="memory-date" name="date" type="date" min="0001-01-01" max="9999-12-31"></label><label class="field"><span>画面描述 <small>可留空</small></span><input id="memory-alt" name="alt" type="text" maxlength="500" placeholder="方便听读照片"></label></div>
+              <div class="form-actions"><button class="editor-submit" type="submit">放到白丝带上 <span aria-hidden="true">↗</span></button><button id="cancel-memory-edit" class="editor-secondary" type="button" hidden>取消编辑</button></div>
+              <p id="memory-feedback" class="editor-feedback" role="status" aria-live="polite"></p>
+            </form>
+            <aside class="saved-content" aria-label="此浏览器收藏的照片"><div class="saved-heading"><h3>丝带上的收藏</h3><span id="memory-count"></span></div><ul id="saved-memories" class="saved-list"></ul></aside>
+          </div>
+        </section>
+        <section id="letter-panel" class="editor-panel" role="tabpanel" aria-labelledby="letter-tab" hidden>
+          <div class="editor-columns">
+            <form id="letter-form" class="editor-form">
+              <label class="field"><span>信的标题 <small>可留空</small></span><input id="letter-name" name="title" type="text" maxlength="200" placeholder="给此刻的你"></label>
+              <label class="field"><span>想对你说</span><textarea id="letter-body" name="body" rows="8" maxlength="100000" required placeholder="从这里，慢慢写。"></textarea></label>
+              <div class="field-row"><label class="field"><span>署名 <small>可留空</small></span><input id="letter-from" name="from" type="text" maxlength="120"></label><label class="field"><span>写信日期 <small>可留空</small></span><input id="letter-date" name="date" type="date" min="0001-01-01" max="9999-12-31"></label></div>
+              <label class="field"><span>信封上的颜色</span><select id="letter-identity" name="identity"><option value="purple">淡紫 · 我</option><option value="green">草绿 · 她</option></select></label>
+              <div class="form-actions"><button class="editor-submit" type="submit">收进信箱 <span aria-hidden="true">↗</span></button><button id="cancel-letter-edit" class="editor-secondary" type="button" hidden>取消编辑</button></div>
+              <p id="letter-feedback" class="editor-feedback" role="status" aria-live="polite"></p>
+            </form>
+            <aside class="saved-content" aria-label="此浏览器收藏的信件"><div class="saved-heading"><h3>留在这里的信</h3><span id="letter-count"></span></div><ul id="saved-letters" class="saved-list"></ul></aside>
+          </div>
+        </section>
+        <footer class="editor-backup"><p>收藏保存在这台设备、当前浏览器的这个网址下。清理网站数据会移除收藏；换浏览器或设备前，请先下载备份。这里的信不会自动发送给对方。</p><div class="backup-actions"><button id="download-content" class="editor-secondary" type="button">下载收藏备份 ↓</button><button id="restore-content" class="editor-secondary" type="button">从备份恢复 ↑</button><input id="content-backup-file" type="file" accept="application/json,.json" hidden></div><p id="backup-feedback" class="editor-feedback" role="status" aria-live="polite"></p></footer>
       </section>
     </dialog>
   </main>

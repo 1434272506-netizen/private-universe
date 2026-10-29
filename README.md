@@ -43,7 +43,9 @@ npm run dev
 | `memories` | `image`、`caption`、`date` |
 | `letters` | `title`、`body`、`from`、`date`、`identity` |
 
-照片文件可放入 `public/memories/`，`image` 使用 `/memories/文件名.jpg` 一类路径。`identity` 使用 `purple` 或 `green`：紫色代表用户，绿色代表她。当前配置随本地源码和构建产物提供；尚无网页上传、编辑、寄信或服务器保存功能。
+进入花园后，右上角「＋ 收藏一段」可以直接添加照片和信件，空相册与空信箱也有添加入口。支持预览、填写、保存、编辑、两步移除及收藏备份恢复。页面添加的内容保存在当前设备、浏览器和网址下的 IndexedDB，照片以 Blob 保存；成功后即时更新阅读层，刷新仍保留。清理网站数据前需下载备份；没有服务器同步或自动寄信能力。完整使用说明见 [内容指南](CONTENT-GUIDE.md)。
+
+维护者预置照片仍可放入 `public/memories/`，`image` 使用 `/memories/文件名.jpg` 一类路径。`identity` 使用 `purple` 或 `green`：紫色代表用户，绿色代表她。预置内容随构建提供，页面编辑和浏览器备份只管理本机添加的记录。
 
 `personal-content.js` 已附中文注释模板，可选 `alt` 描述照片画面，未知日期可留空。添加后运行 `npm run check:content` 检查文件、字段、日期和正文，再打开花园查看。当前两个数组依然为空，没有自动填入测试照片或信件。
 
@@ -51,7 +53,7 @@ npm run dev
 
 主岛保留左侧记忆树、枝头白丝带、中部浅溪与天然踏石、前右薄瀑，以及右侧奶油白信箱和浅橡木长椅。白色雏菊、淡紫野花、少量柔和彩球、厚实不规则岩土断面、低处云层和远处小岛共同形成高空春日空间。
 
-当前入口为 `src/natural/engine.js`。地形、材质、植物、水、道具与天空位于同目录的独立模块；`src/stories.js` 负责读取个人内容并生成阅读层。旧原型文件保留，但不由当前入口引用。河石和植物使用实例化，家具合并网格，远岛降低细分；没有进行目标设备的正式帧率基准测试。
+当前入口为 `src/natural/engine.js`。地形、材质、植物、水、道具与天空位于同目录的独立模块；`src/stories.js` 合并预置与本机内容并生成阅读层，`src/content-editor.js` 管理添加面板，`src/local-content.js` 负责事务保存与备份。旧原型文件保留，但不由当前入口引用。河石和植物使用实例化，家具合并网格，远岛降低细分；没有进行目标设备的正式帧率基准测试。
 
 ## 检查
 
@@ -63,7 +65,7 @@ node scripts/review-overall-design.mjs
 node scripts/review-stories.mjs
 ```
 
-也可在开发服务运行时执行 `npm test`，先检查内容配置，再依次运行场景、阅读、新树和丝带过渡专项检查；`npm run test:tree` 与 `npm run test:presentation` 可分别执行后两组。新树记录在 `work/qa/love-tree/`，展开/中断/减少动态效果记录在 `work/qa/ribbon-transition/`。
+也可在开发服务运行时执行 `npm test`，先检查内容配置，再依次运行场景、阅读、新树、丝带过渡和页面添加检查；`npm run test:content-editor` 可单独验证添加/修改/移除、刷新保存和备份恢复。新树记录在 `work/qa/love-tree/`，展开/中断/减少动态效果记录在 `work/qa/ribbon-transition/`，添加检查在 `work/qa/content-editor/`。
 
 该脚本使用本机 Edge 与 Playwright，检查邀请页、可跳过开场、场景物件点击、阅读层与空状态、返回镜头、拖动和点击的区分、长椅视角、缩放边界、减少动态效果及多视角渲染。结果写入 `screenshots/overall-design-review.json`，截图为 `screenshots/design-*.png`。
 
@@ -90,7 +92,8 @@ node scripts/smoke-production.mjs
 - [GitHub 参考与借鉴计划](REFERENCES.md) 记录实际核实的 Napali 源码、固定版本、本轮采用的方法与后续研究顺序。
 - [最新母树实施报告](REPORT-2026-10-29-TREE-IMPLEMENTATION.md) 记录基线恢复、实际模型、接入与 49 项检查；[第二轮开发记录](REPORT-2026-10-28-REFERENCE-REFINEMENT.md) 保留此前环境与阅读功能的历史记录。
 - [画面收尾与素材添加报告](REPORT-2026-10-29-VISUAL-FINISH.md) 记录本次环境、阅读、丝带过渡和静态素材添加途径，以及 59 项页面/交互检查。
+- [页面添加入口报告](REPORT-2026-10-29-PAGE-CONTENT-ENTRY.md) 记录后续页面添加、浏览器保存、编辑、移除与备份恢复，以及新增 15 项真实交互检查。
 - `DESIGN-SOURCE.md` 保存原始 V0.1 brief、来源和后续恢复记录；双方原文位于上一级 `对话恢复/总体设计-消息原文.json`。
 - `DESIGN.md` 区分总体设计已确认方向、当前实现和仍待完成的体验。旧报告保留其发生日期，仅反映当时状态。
-- 当前着重电脑上的全景、自然空间和隐藏入口。声音与音乐、登录身份、双人同步、共同在线标记、网页上传编辑，以及气球创建、接收者权限、放飞与档案流程尚未实现；不会将本地物件展示视为完整双人系统。
+- 当前着重电脑上的全景、自然空间和隐藏入口。页面添加、编辑与浏览器本地保存已实现；声音与音乐、登录身份、服务器保存、双人同步、共同在线标记，以及气球创建、接收者权限、放飞与档案流程尚未实现；不会将本地收藏视为完整双人系统。
 - 母树为实际制作的 GLB，环境仍有程序化近似。岩体、树冠、草叶、水面、云与薄瀑可继续美术深化；缓存阴影不能完全对应每一帧风动。构建仍有渲染模块体积提示，窄屏可用不代表手机真机验收。

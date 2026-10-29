@@ -3,7 +3,7 @@ import './stories.css';
 
 const records=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
 const contentText=value=>typeof value==='string'?value:typeof value==='number'?String(value):'';
-const memories=records(suppliedMemories),letters=records(suppliedLetters);
+let memories=[],letters=[],storyEvents;
 
 const element=(tag,className,text)=>{
   const node=document.createElement(tag);
@@ -42,16 +42,28 @@ function installDetailEscape(dialog,isDetail,back){
   dialog.addEventListener('cancel',event=>{
     if(!isDetail())return;
     event.preventDefault();event.stopImmediatePropagation();back();
-  },true);
+  },{capture:true,signal:storyEvents.signal});
 }
 
-export function prepareStories(){
+function addContentButton(kind){
+  return button(kind==='memory'?'收藏第一张照片 ↗':'写下第一封信 ↗','story-add-content',()=>{
+    document.dispatchEvent(new CustomEvent('content-add',{detail:{kind}}));
+  });
+}
+export function prepareStories(local={memories:[],letters:[]}){
+  storyEvents?.abort();storyEvents=new AbortController();
+  memories=[...records(suppliedMemories),...records(local.memories)];
+  letters=[...records(suppliedLetters),...records(local.letters)];
   const memoryContent=document.querySelector('#memory-content'),letterContent=document.querySelector('#letter-content');
+  memoryContent.replaceChildren();letterContent.replaceChildren();
+  memoryContent.classList.remove('has-memories','is-reading-photo');
   if(!memories.length){
     memoryContent.innerHTML='<div class="empty-memory"><div class="empty-photo" aria-hidden="true"></div><p>这一段丝带，还留着空白。</p><small>还没有放入照片</small></div>';
+    memoryContent.firstElementChild.append(addContentButton('memory'));
   }else prepareMemories(memoryContent);
   if(!letters.length){
     letterContent.innerHTML='<div class="empty-letter"><div class="envelope-mark" aria-hidden="true"></div><p>信箱还空着。</p><small>这里会收好，写给彼此的信。</small></div>';
+    letterContent.firstElementChild.append(addContentButton('letter'));
   }else prepareLetters(letterContent);
 }
 
@@ -95,9 +107,9 @@ function prepareMemories(root){
       const next=current+(event.key==='ArrowLeft'?-1:1);
       if(next>=0&&next<memories.length)showPhoto(next);
     }
-  });
+  },{signal:storyEvents.signal});
   installDetailEscape(dialog,()=>current>=0,()=>showCollection(true));
-  dialog.addEventListener('close',()=>showCollection());showCollection();
+  dialog.addEventListener('close',()=>showCollection(),{signal:storyEvents.signal});showCollection();
 }
 
 function prepareLetters(root){
@@ -133,5 +145,5 @@ function prepareLetters(root){
     root.append(toolbar,article);resetScroll(dialog);back.focus({preventScroll:true});
   }
   installDetailEscape(dialog,()=>current>=0,()=>showEnvelopes(true));
-  dialog.addEventListener('close',()=>showEnvelopes());showEnvelopes();
+  dialog.addEventListener('close',()=>showEnvelopes(),{signal:storyEvents.signal});showEnvelopes();
 }

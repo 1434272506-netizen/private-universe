@@ -9,6 +9,7 @@ import {prepareStories} from '../stories.js';
 import {makeLighting} from './lighting.js';
 import {loadCenterpieceTree} from './loveTree.js';
 import {presentRibbon} from '../ribbon-transition.js';
+import {prepareContentEditor} from '../content-editor.js';
 
 const $=selector=>document.querySelector(selector);
 const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
@@ -95,6 +96,7 @@ let elapsed=0,lastFrame=performance.now(),ready=false,phase='invitation';
 let currentView='hero',flight=null,intro=null,savedView=null,pendingStory=null,activePlace=null,activeDialog=null;
 let shadowUntil=0,hintUntil=0,closing=false;
 let ribbonPresentation=null;
+let contentEditorOpen=false;
 const ease=t=>t*t*t*(t*(t*6-15)+10);
 function announce(text){$('#announcement').textContent=text;}
 function setPhase(next){phase=next;app.dataset.phase=next;canvasUI.inert=next!=='exploring';}
@@ -166,7 +168,7 @@ function returnToGarden(){
   }else frame('hero',true);
 }
 function showStory(kind){
-  if(activePlace!==kind||phase!=='exploring')return;
+  if(activePlace!==kind||phase!=='exploring'||contentEditorOpen)return;
   const dialog=$(kind==='ribbon'?'#memory-dialog':'#letter-dialog');
   const point=anchors[kind].clone().project(camera);
   const surface=dialog.querySelector('.story-surface');
@@ -177,7 +179,7 @@ function showStory(kind){
   dialog.querySelector('.close-story').focus({preventScroll:true});
 }
 function discover(kind){
-  if(!Object.hasOwn(anchors,kind)||phase!=='exploring'||activeDialog||closing)return;
+  if(!Object.hasOwn(anchors,kind)||phase!=='exploring'||activeDialog||closing||contentEditorOpen)return;
   closeHelp();hideHint();setTour(false);pendingStory=null;$('#explore-hint').classList.remove('is-visible');
   savedView??=snapshot();activePlace=kind;$('#return-view').hidden=false;
   const which=kind==='ribbon'?'tree':kind,preset=presets[which];currentView=which;caption(which);
@@ -198,6 +200,11 @@ async function closeStory(){
   returnToGarden();$('#help-toggle').focus({preventScroll:true});
 }
 prepareStories();
+prepareContentEditor({
+  onChange:prepareStories,
+  onOpen:()=>{contentEditorOpen=true;closeHelp();hideHint();setTour(false);pendingStory=null;controls.enabled=false;},
+  onClose:()=>{contentEditorOpen=false;controls.enabled=phase==='exploring'&&!activeDialog;}
+});
 for(const dialog of document.querySelectorAll('.story-dialog')){
   dialog.querySelector('.close-story').addEventListener('click',closeStory);
   dialog.addEventListener('cancel',event=>{event.preventDefault();closeStory();});
@@ -230,6 +237,7 @@ $('#fullscreen').addEventListener('click',async()=>{
 });
 document.addEventListener('fullscreenchange',()=>$('#fullscreen').setAttribute('aria-label',document.fullscreenElement?'退出全屏':'进入全屏'));
 window.addEventListener('keydown',event=>{
+  if(contentEditorOpen)return;
   if(event.target instanceof HTMLElement&&(/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable))return;
   if(event.key==='Escape'){
     if(activeDialog)return;
@@ -248,7 +256,7 @@ const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
 const interactive=[ribbon,props.mailbox,props.bench].filter(Boolean);
 const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),...treeAsset.trunkMeshes].filter(Boolean);
 function pick(clientX,clientY){
-  if(phase!=='exploring'||activeDialog||flight||intro)return null;
+  if(phase!=='exploring'||activeDialog||flight||intro||contentEditorOpen)return null;
   mouse.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
   const hit=raycaster.intersectObjects(interactive,true)[0];
   if(hit){
