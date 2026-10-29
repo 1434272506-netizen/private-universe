@@ -1,10 +1,11 @@
 // These records stay in this browser, on this site's address. Nothing is uploaded.
 const DATABASE='private-universe-content';
-const VERSION=1;
+const VERSION=2;
 const PHOTO_LIMIT=20*1024*1024;
 const BACKUP_LIMIT=512*1024*1024;
 const IMAGE_TYPES=new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif']);
 const STORES={memory:'memories',letter:'letters'};
+const IMPORTS='imports';
 let connectionPromise=null;
 let currentImageURLs=[];
 
@@ -22,7 +23,7 @@ function openDatabase(){
     const request=indexedDB.open(DATABASE,VERSION);
     request.onupgradeneeded=()=>{
       const database=request.result;
-      for(const store of Object.values(STORES)){
+      for(const store of [...Object.values(STORES),IMPORTS]){
         if(!database.objectStoreNames.contains(store))database.createObjectStore(store,{keyPath:'id'});
       }
     };
@@ -166,6 +167,62 @@ export async function saveLocalLetter(value){
   await writeOne('letters',id,()=>fields);
 }
 
+export async function hasOriginalPhotoImport(importId){
+  identifier(importId);
+  const database=await openDatabase();
+  return new Promise((resolve,reject)=>{
+    let transaction,exists=false;
+    try{
+      transaction=database.transaction(IMPORTS,'readonly');
+      const request=transaction.objectStore(IMPORTS).getKey(importId);
+      request.onsuccess=()=>{exists=request.result!==undefined;};
+    }catch(error){reject(failure(error,'无法读取照片导入记录，请重试。'));return;}
+    transaction.oncomplete=()=>resolve(exists);
+    transaction.onabort=()=>reject(failure(transaction.error,'无法读取照片导入记录，请重试。'));
+    transaction.onerror=()=>{};
+  });
+}
+
+// Preserve the original bytes. Import records and the batch marker commit together;
+// a later visit must not resurrect photographs that the user has removed.
+export async function importOriginalPhotos(importId,records){
+  identifier(importId);
+  if(await hasOriginalPhotoImport(importId))return {imported:0,alreadyImported:true};
+  if(!Array.isArray(records)||!records.length)throw new Error('没有找到要导入的原始照片。');
+  const prepared=[],seen=new Set(),now=Date.now();
+  for(const [index,record] of records.entries()){
+    const fields=memoryFields(record),id=identifier(record.id);
+    if(seen.has(id))throw new Error('这批照片中有重复编号，尚未导入。');
+    seen.add(id);
+    const photo=await validatePhoto(record.photo);
+    prepared.push({...fields,id,photo,createdAt:now+index,updatedAt:now,pristineOriginal:true});
+  }
+  const database=await openDatabase();
+  return new Promise((resolve,reject)=>{
+    let transaction,customError,imported=0,alreadyImported=false;
+    try{
+      transaction=database.transaction(['memories',IMPORTS],'readwrite');
+      const imports=transaction.objectStore(IMPORTS),memories=transaction.objectStore('memories');
+      const marker=imports.getKey(importId);
+      marker.onsuccess=()=>{
+        if(marker.result!==undefined){alreadyImported=true;return;}
+        try{
+          for(const record of prepared){
+            const existing=memories.getKey(record.id);
+            existing.onsuccess=()=>{
+              if(existing.result===undefined){memories.add(record);imported++;}
+            };
+          }
+          imports.add({id:importId,importedAt:now,count:prepared.length});
+        }catch(error){customError=error;transaction.abort();}
+      };
+    }catch(error){transaction?.abort();reject(failure(error,'原始照片尚未导入，请重试。'));return;}
+    transaction.oncomplete=()=>resolve({imported,alreadyImported});
+    transaction.onabort=()=>reject(failure(customError||transaction.error,'原始照片尚未导入，请重试。'));
+    transaction.onerror=()=>{};
+  });
+}
+
 export async function deleteLocalContent(kind,id){
   const storeName=STORES[kind];
   if(!storeName)throw new Error('请选择要移除的照片或信件。');
@@ -196,6 +253,7 @@ export async function downloadContentBackup(){
   const memories=[];
   for(const record of records.memories){
     const {photo,...fields}=record;
+    delete fields.pristineOriginal;
     memories.push({...fields,image:await readBlobAsDataURL(photo)});
   }
   const backup={format:'private-universe-content',version:1,exportedAt:new Date().toISOString(),memories,letters:records.letters};
@@ -253,10 +311,12 @@ export async function restoreContentBackup(file){
       for(const kind of Object.values(STORES)){
         const store=transaction.objectStore(kind);
         for(const record of prepared[kind]){
-          const request=store.getKey(record.id);
+          const request=store.get(record.id);
           request.onsuccess=()=>{
-            // Stable backup IDs make repeated restores safe and never overwrite edits.
+            // A fresh browser has automatic originals, not the user's later edits.
+            // Only untouched originals may be replaced; edited/restored records win.
             if(request.result===undefined){store.add(record);added[kind]++;}
+            else if(kind==='memories'&&request.result.pristineOriginal===true){store.put(record);added[kind]++;}
           };
         }
       }

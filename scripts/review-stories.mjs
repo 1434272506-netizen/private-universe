@@ -1,6 +1,8 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import {providedPhotoImport} from '../src/personal-content.js';
+import {prepareEmptyFixtureCollection,waitForContentReady} from './review-fixture-storage.mjs';
 
 // Fixtures are intercepted in this browser only, never written as personal content.
 const svg=(w,h,color)=>`data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="100%" height="100%" fill="${color}"/><text x="15" y="35" font-size="20">LAYOUT TEST ONLY</text></svg>`)}`;
@@ -16,11 +18,13 @@ const fixtures={
   ],
 };
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
-const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+await prepareEmptyFixtureCollection(context);
+const page=await context.newPage();
 const errors=[],checks=[];
 page.on('pageerror',e=>errors.push(e.message));
 page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-await page.route('**/src/personal-content.js*',route=>route.fulfill({contentType:'text/javascript',body:`export const memories=${JSON.stringify(fixtures.memories)};export const letters=${JSON.stringify(fixtures.letters)};`}));
+await page.route('**/src/personal-content.js*',route=>route.fulfill({contentType:'text/javascript',body:`export const memories=${JSON.stringify(fixtures.memories)};export const letters=${JSON.stringify(fixtures.letters)};export const providedPhotoImport=${JSON.stringify({id:providedPhotoImport.id,photos:[]})};`}));
 await page.route('**/fixture-unreadable.jpg',route=>route.fulfill({contentType:'image/jpeg',body:'not an image'}));
 const check=async(name,fn)=>{await fn();checks.push(name);console.log('PASS',name);};
 async function openPlace(place){await page.locator('#help-toggle').click();await page.locator(`[data-place="${place}"]`).click();}
@@ -28,6 +32,7 @@ async function closeDialog(name){await page.locator(`#${name} .close-story`).cli
 try{
   await page.goto(process.env.PREVIEW_URL||'http://127.0.0.1:5173/',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});
+  await waitForContentReady(page);
   await page.locator('#enter-direct').click();
   await openPlace('mailbox');await page.locator('#letter-dialog').waitFor({state:'visible'});
   await page.screenshot({path:'screenshots/stories-fixture-envelopes.png'});

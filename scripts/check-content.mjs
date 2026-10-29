@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {memories,letters} from '../src/personal-content.js';
+import {createHash} from 'node:crypto';
+import {memories,letters,providedPhotoImport} from '../src/personal-content.js';
 
 const defaultPhotoRoot=fileURLToPath(new URL('../public/memories/',import.meta.url));
 const supportedImages=new Set(['.jpg','.jpeg','.png','.webp','.avif','.gif']);
@@ -99,9 +100,20 @@ export async function validateContent(content,{photoRoot=defaultPhotoRoot}={}){
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const result=await validateContent({memories,letters});
+  const originalPhotos=providedPhotoImport?.photos||[];
+  const originals=await validateContent({memories:originalPhotos,letters:[]});
+  result.errors.push(...originals.errors.map(error=>`原图导入：${error}`));
+  if(originals.valid){
+    for(const photo of originalPhotos){
+      const bytes=await fs.readFile(path.join(defaultPhotoRoot,decodeURIComponent(photo.image.slice('/memories/'.length))));
+      if(bytes.length!==photo.bytes||createHash('sha256').update(bytes).digest('hex')!==photo.sha256)result.errors.push(`${photo.alt}的原文件校验不一致。`);
+    }
+  }
+  result.valid=result.errors.length===0;
   if(result.valid){
-    console.log(`内容配置有效：${result.memories} 张照片，${result.letters} 封信。`);
-    if(!result.memories&&!result.letters)console.log('当前为空，等待真实素材；没有写入或生成任何回忆。');
+    console.log(`内容配置有效：${result.memories} 张额外预置照片，${result.letters} 封信，${originalPhotos.length} 张首次导入原图。`);
+    if(originalPhotos.length)console.log('原图字节数与 SHA-256 均匹配；导入后可在页面编辑说明。');
+    else if(!result.memories&&!result.letters)console.log('当前为空，等待真实素材；没有写入或生成任何回忆。');
   }else{
     for(const error of result.errors)console.error(`- ${error}`);
     process.exitCode=1;

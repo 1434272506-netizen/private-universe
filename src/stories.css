@@ -26,6 +26,7 @@
 .story-page-button:disabled{opacity:.35;cursor:default;border-bottom-color:transparent}
 .story-position{font:11px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
 .memory-reader{margin:0;min-width:0}
+.story-original-tools{margin:15px 3px 0}.story-original{color:var(--muted);font:11px/1.8 var(--sans);text-underline-offset:4px}.story-original:hover{color:var(--ink)}
 .memory-reader .story-photograph{background:#eceee3;box-shadow:0 2px 8px #34472b0b}
 .memory-reader img{display:block;width:100%;height:auto;max-height:54vh;object-fit:contain}
 .memory-reader figcaption{font:15px/1.95 var(--chinese);letter-spacing:.015em;white-space:pre-wrap;overflow-wrap:anywhere;padding:24px 3px 0}

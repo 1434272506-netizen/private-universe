@@ -1,4 +1,5 @@
 import {loadLocalContent,saveLocalMemory,saveLocalLetter,deleteLocalContent,downloadContentBackup,restoreContentBackup} from './local-content.js';
+import {importProvidedPhotos} from './photo-import.js';
 import './content-editor.css';
 
 const $=selector=>document.querySelector(selector);
@@ -16,7 +17,7 @@ const feedback=(kind,text,error=false)=>{
 export function prepareContentEditor({onChange,onOpen=()=>{},onClose=()=>{}}){
   const dialog=$('#content-dialog'),memoryForm=$('#memory-form'),letterForm=$('#letter-form');
   let content={memories:[],letters:[]},memoryId=null,letterId=null,busy=false,previewURL=null;
-  let returnFocus=null,loaded=false,tab='memory';
+  let returnFocus=null,loaded=false,tab='memory',initialization=null;
   const dirty={memory:false,letter:false};
   memoryForm.addEventListener('input',()=>{dirty.memory=true;});
   letterForm.addEventListener('input',()=>{dirty.letter=true;});
@@ -102,7 +103,7 @@ export function prepareContentEditor({onChange,onOpen=()=>{},onClose=()=>{}}){
     if(dialog.open)return;
     returnFocus=document.activeElement;chooseTab(kind);onOpen();dialog.showModal();
     dialog.scrollTop=0;$(`#${tab==='memory'?'photo':'letter'}-tab`).focus();
-    if(!loaded)reload().catch(error=>feedback('backup',error.message||'暂时无法读取本机收藏。',true));
+    if(!loaded)initialize();
   }
   $('#add-content').addEventListener('click',()=>open());
   document.addEventListener('content-add',event=>open(event.detail?.kind));
@@ -164,6 +165,23 @@ export function prepareContentEditor({onChange,onOpen=()=>{},onClose=()=>{}}){
     }catch(error){feedback('backup',restored?'备份已恢复，列表暂时未能刷新。请重新打开页面查看。':error.message||'备份未能恢复，原来的收藏仍在。',true);}
     finally{$('#content-backup-file').value='';setBusy(false);}
   });
-  const ready=reload().catch(error=>{feedback('backup',error.message||'暂时无法读取本机收藏，请重新打开页面。',true);});
+  function initialize(){
+    if(initialization)return initialization;
+    setBusy(true);feedback('backup','正在读取照片与收藏…');
+    initialization=(async()=>{
+      let importError;
+      try{
+        let result;
+        try{result=await importProvidedPhotos();}catch(error){importError=error;}
+        // A failed original import must not hide previously saved personal content.
+        await reload();
+        if(importError){loaded=false;feedback('backup',importError.message||'原图暂时未能导入，请重新打开页面重试。',true);}
+        else feedback('backup',result?.imported?`已收好 ${result.imported} 张照片，原图和原比例都保留了。`:'');
+      }catch(error){feedback('backup',error.message||'暂时无法读取本机收藏，请重新打开页面。',true);}
+      finally{setBusy(false);initialization=null;if(dialog.open)$(`#${tab==='memory'?'photo':'letter'}-tab`).focus({preventScroll:true});}
+    })();
+    return initialization;
+  }
+  const ready=initialize();
   return {open,ready};
 }

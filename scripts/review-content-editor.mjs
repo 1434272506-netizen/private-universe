@@ -2,6 +2,7 @@ import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {memories as staticMemories,letters as staticLetters} from '../src/personal-content.js';
+import {prepareEmptyFixtureCollection,waitForContentReady} from './review-fixture-storage.mjs';
 
 // Test content exists only in isolated browser contexts, never in personal-content.js.
 const base=process.env.REVIEW_URL||'http://127.0.0.1:5173/';
@@ -9,6 +10,7 @@ const out=process.env.CONTENT_REVIEW_OUTPUT||'work/qa/content-editor';
 await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce',acceptDownloads:true});
+await prepareEmptyFixtureCollection(context);
 const page=await context.newPage();
 const errors=[],checks=[];
 let failure;
@@ -22,6 +24,7 @@ async function check(name,fn){await fn();checks.push(name);console.log('PASS',na
 async function start(target){
   await target.goto(base,{waitUntil:'networkidle'});
   await target.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});
+  await waitForContentReady(target);
   await target.locator('#enter-direct').click();
 }
 async function openPlace(place){await page.locator('#help-toggle').click();await page.locator(`[data-place="${place}"]`).click();await page.locator(place==='ribbon'?'#memory-dialog':'#letter-dialog').waitFor({state:'visible'});}
@@ -91,6 +94,7 @@ try{
   });
   await check('Browser reload preserves both photograph Blob and letter',async()=>{
     await page.reload({waitUntil:'networkidle'});await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});await page.locator('#enter-direct').click();
+    await waitForContentReady(page);
     await openEditor();assert.equal(await page.locator('#saved-memories .saved-item').count(),1);
     assert.ok(await page.locator('#saved-memories img').evaluate(el=>el.complete&&el.naturalWidth===1));
     await page.locator('#letter-tab').click();assert.equal(await page.locator('#saved-letters .saved-item').count(),1);
@@ -120,6 +124,7 @@ try{
   });
   await check('Backup restores in another isolated browser context; repeated restore does not duplicate',async()=>{
     const other=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
+    await prepareEmptyFixtureCollection(other);
     const target=await other.newPage();target.on('pageerror',error=>errors.push(error.message));
     try{
       await start(target);await openEditor(target);await target.locator('#content-backup-file').setInputFiles(backupPath);await saved(target,'backup','已恢复 1 张照片、1 封信');

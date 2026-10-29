@@ -1,7 +1,9 @@
 import {chromium} from 'playwright-core';
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
-import {memories,letters} from '../src/personal-content.js';
+import {memories,letters,providedPhotoImport} from '../src/personal-content.js';
+import {waitForContentReady} from './review-fixture-storage.mjs';
+const expectedMemories=memories.length+providedPhotoImport.photos.length;
 
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});
@@ -12,6 +14,7 @@ async function check(label,fn){await fn();verified.push(label);console.log('PASS
 try{
   await page.goto(process.env.PRODUCTION_PREVIEW_URL||'http://127.0.0.1:5174/',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});
+  await waitForContentReady(page);
   await check('Production renders; development hooks absent',async()=>{
     assert.equal(await page.locator('#enter').isEnabled(),true);
     assert.equal(await page.evaluate(()=>typeof window.__PU),'undefined');
@@ -21,7 +24,7 @@ try{
   await check('Ribbon opens and closes through the accessible controls',async()=>{
     await page.locator('#help-toggle').click();await page.locator('[data-place="ribbon"]').click();
     await page.locator('#memory-dialog').waitFor({state:'visible'});
-    if(memories.length)assert.equal(await page.locator('.memory-card').count(),memories.length);
+    if(expectedMemories)assert.equal(await page.locator('.memory-card').count(),expectedMemories);
     else assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
     await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});await page.waitForTimeout(1800);
   });

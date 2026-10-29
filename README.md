@@ -32,7 +32,7 @@ npm run dev
 
 ## 真实内容
 
-当前尚未提供真实照片或信件，白丝带和信箱显示空状态；没有自动生成情侣回忆、示例情书或虚构日期。
+2026-10-29 已按用户提供的顺序导入 10 张真实照片，原 JPEG 与附件逐字节相同，保留分辨率与比例，缩略及详情都不裁切。首次打开自动进入本机收藏，可在页面添加说明和日期、编辑或移除；详情提供「打开原图」。信件仍为空，没有代写经历、情书或日期。
 
 配置内容后，照片可点击放大，使用前后按钮或左右方向键切换；信件从信封列表逐封打开。详情中的 Esc 返回列表，再按一次关闭阅读层。图片读取失败有文字替代，长信和长标题可滚动阅读。
 
@@ -47,7 +47,7 @@ npm run dev
 
 维护者预置照片仍可放入 `public/memories/`，`image` 使用 `/memories/文件名.jpg` 一类路径。`identity` 使用 `purple` 或 `green`：紫色代表用户，绿色代表她。预置内容随构建提供，页面编辑和浏览器备份只管理本机添加的记录。
 
-`personal-content.js` 已附中文注释模板，可选 `alt` 描述照片画面，未知日期可留空。添加后运行 `npm run check:content` 检查文件、字段、日期和正文，再打开花园查看。当前两个数组依然为空，没有自动填入测试照片或信件。
+`personal-content.js` 的 `providedPhotoImport` 记录这批原图清单和校验值，首次导入的照片可在页面管理、备份；批次记录避免重复导入和删除后重新出现。额外静态 `memories/letters` 数组继续保留，目前为空。`npm run check:content` 检查本地文件、字段和原图哈希，不读取浏览器收藏。
 
 ## 场景与结构
 
@@ -65,7 +65,7 @@ node scripts/review-overall-design.mjs
 node scripts/review-stories.mjs
 ```
 
-也可在开发服务运行时执行 `npm test`，先检查内容配置，再依次运行场景、阅读、新树、丝带过渡和页面添加检查；`npm run test:content-editor` 可单独验证添加/修改/移除、刷新保存和备份恢复。新树记录在 `work/qa/love-tree/`，展开/中断/减少动态效果记录在 `work/qa/ribbon-transition/`，添加检查在 `work/qa/content-editor/`。
+也可在开发服务运行时执行 `npm test`，先检查内容配置，再依次运行场景、阅读、新树、丝带过渡、页面添加和真实原图检查；`npm run test:content-editor` 可单独验证添加/修改/移除、刷新保存和备份恢复，`npm run test:originals` 检查本批原图字节、尺寸、比例、编辑和备份。原图检查默认读取本机收到的附件目录，可用 `SOURCE_PHOTO_DIR` 指定迁移后的来源目录。新树记录在 `work/qa/love-tree/`，展开/中断/减少动态效果记录在 `work/qa/ribbon-transition/`，添加检查在 `work/qa/content-editor/`，原图检查在 `work/qa/real-photo-import/`。
 
 该脚本使用本机 Edge 与 Playwright，检查邀请页、可跳过开场、场景物件点击、阅读层与空状态、返回镜头、拖动和点击的区分、长椅视角、缩放边界、减少动态效果及多视角渲染。结果写入 `screenshots/overall-design-review.json`，截图为 `screenshots/design-*.png`。
 
@@ -93,6 +93,7 @@ node scripts/smoke-production.mjs
 - [最新母树实施报告](REPORT-2026-10-29-TREE-IMPLEMENTATION.md) 记录基线恢复、实际模型、接入与 49 项检查；[第二轮开发记录](REPORT-2026-10-28-REFERENCE-REFINEMENT.md) 保留此前环境与阅读功能的历史记录。
 - [画面收尾与素材添加报告](REPORT-2026-10-29-VISUAL-FINISH.md) 记录本次环境、阅读、丝带过渡和静态素材添加途径，以及 59 项页面/交互检查。
 - [页面添加入口报告](REPORT-2026-10-29-PAGE-CONTENT-ENTRY.md) 记录后续页面添加、浏览器保存、编辑、移除与备份恢复，以及新增 15 项真实交互检查。
+- [10 张原图导入报告](REPORT-2026-10-29-ORIGINAL-PHOTOS.md) 记录用户真实照片的原字节导入、原比例展示、可编辑收藏，以及 15 项真实照片检查。
 - `DESIGN-SOURCE.md` 保存原始 V0.1 brief、来源和后续恢复记录；双方原文位于上一级 `对话恢复/总体设计-消息原文.json`。
 - `DESIGN.md` 区分总体设计已确认方向、当前实现和仍待完成的体验。旧报告保留其发生日期，仅反映当时状态。
 - 当前着重电脑上的全景、自然空间和隐藏入口。页面添加、编辑与浏览器本地保存已实现；声音与音乐、登录身份、服务器保存、双人同步、共同在线标记，以及气球创建、接收者权限、放飞与档案流程尚未实现；不会将本地收藏视为完整双人系统。

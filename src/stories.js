@@ -98,6 +98,13 @@ function prepareMemories(root){
     const prev=button('← 上一张','story-page-button',()=>showPhoto(current-1));prev.disabled=index===0;
     const next=button('下一张 →','story-page-button',()=>showPhoto(current+1));next.disabled=index===memories.length-1;
     pagination.append(prev,next);root.append(toolbar,figure,pagination);resetScroll(dialog);
+    if(typeof memory.image==='string'){
+      const originalURL=new URL(memory.image,location.href);
+      if(['http:','https:','blob:'].includes(originalURL.protocol)){
+        const original=element('a','story-original','打开原图 ↗');original.href=originalURL.href;original.target='_blank';original.rel='noopener';
+        const tools=element('div','story-original-tools');tools.append(original);figure.after(tools);
+      }
+    }
     if(focus)back.focus({preventScroll:true});
   }
   dialog.addEventListener('keydown',event=>{

@@ -1,7 +1,9 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import {memories,letters} from '../src/personal-content.js';
+import {memories,letters,providedPhotoImport} from '../src/personal-content.js';
+import {waitForContentReady} from './review-fixture-storage.mjs';
+const expectedMemories=memories.length+providedPhotoImport.photos.length;
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});
 const errors=[],checks=[],metrics=[];
@@ -16,6 +18,7 @@ async function clickObject(kind){const c=await coordinates(kind);await page.mous
 try{
   await page.goto(base,{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});
+  await waitForContentReady(page);
   await page.waitForTimeout(400);
   await check('Invitation waits for user input after real scene readiness',async()=>{
     assert.equal(await page.locator('#enter').isEnabled(),true);assert.equal(await page.evaluate(()=>window.__PU.phase),'invitation');
@@ -32,7 +35,7 @@ try{
   const original=await page.evaluate(()=>({position:window.__PU.camera.position.toArray(),target:window.__PU.controls.target.toArray()}));
   await check('Physical ribbon opens the memory scroll',async()=>{
     await clickObject('ribbon');await page.locator('#memory-dialog').waitFor({state:'visible',timeout:10000});await page.waitForTimeout(1000);
-    if(memories.length)assert.equal(await page.locator('.memory-card').count(),memories.length);
+    if(expectedMemories)assert.equal(await page.locator('.memory-card').count(),expectedMemories);
     else assert.equal(await page.getByText('还没有放入照片',{exact:true}).isVisible(),true);
     assert.equal(await page.evaluate(()=>window.__PU.controls.enabled),false);
   });await capture('design-memory');
@@ -101,6 +104,7 @@ try{
   await page.setViewportSize({width:1600,height:1000});
   await page.emulateMedia({reducedMotion:'reduce'});await page.reload({waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true');
+  await waitForContentReady(page);
   await page.locator('#enter').click();
   await check('Reduced motion skips camera introduction',async()=>assert.equal(await page.evaluate(()=>window.__PU.phase),'exploring'));
   await clickObject('mailbox');await page.locator('#letter-dialog').waitFor({state:'visible'});
