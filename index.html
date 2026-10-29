@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#faf9f0">
+  <meta name="description" content="Private Universe，一座只属于两个人的春日花园。">
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="/src/style.css">
+  <title>Private Universe · 一隅春天</title>
+</head>
+<body>
+  <main id="app" data-phase="invitation">
+    <section id="invitation" aria-labelledby="invitation-title">
+      <span class="invitation-overline">A LITTLE PLACE IN THE SKY</span>
+      <div class="invitation-body">
+        <div class="two-dots" aria-hidden="true"><i></i><i></i></div>
+        <h1 id="invitation-title">Private Universe</h1>
+        <p class="invitation-line">有个地方，想带你去看看。</p>
+        <div class="invitation-action">
+          <p id="loading" role="status" aria-live="polite">有一个小世界，正在为你醒来。</p>
+          <button id="enter" class="enter-button" type="button" disabled>进入这座花园 <span aria-hidden="true">↗</span></button>
+          <button id="enter-direct" class="quiet-button" type="button" hidden>直接看花园</button>
+        </div>
+      </div>
+      <span class="invitation-footnote">MADE FOR TWO <span aria-hidden="true">—</span> A SPRING OF OUR OWN</span>
+    </section>
+    <div id="garden-ui" inert>
+      <header class="masthead"><span>Private Universe<span class="brand-dot">.</span></span><span class="brand-note">一隅春天</span></header>
+      <div class="top-actions" aria-label="花园选项">
+        <button class="icon-button" id="help-toggle" type="button" aria-label="查看操作说明" aria-expanded="false" aria-controls="help-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.3 1.8-2.3 3.6M12 16.6h.01"/></svg></button>
+        <button class="icon-button" id="fullscreen" type="button" aria-label="进入全屏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4H4v4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"/></svg></button>
+      </div>
+      <aside id="help-panel" hidden>
+        <p class="help-title">慢慢看，不必赶路。</p>
+        <dl><div><dt>拖动鼠标</dt><dd>环绕花园</dd></div><div><dt>滚动滚轮</dt><dd>靠近 / 退远</dd></div><div><dt>轻点物件</dt><dd>发现藏着的故事</dd></div><div><dt><kbd>Esc</kbd></dt><dd>回到花园</dd></div><div><dt><kbd>R</kbd></dt><dd>回到全景</dd></div></dl>
+        <div class="help-places" aria-label="用键盘探索花园"><button type="button" data-place="ribbon">看看白丝带 <span>↗</span></button><button type="button" data-place="mailbox">打开信箱 <span>↗</span></button><button type="button" data-place="bench">在长椅坐一会儿 <span>↗</span></button></div>
+        <button id="replay" class="quiet-button" type="button">再看一次初见</button>
+      </aside>
+      <div class="garden-footer">
+        <div class="scene-caption"><span class="caption-title" id="view-title">风很轻，日子很慢。</span><span class="caption-note" id="view-note">Somewhere, just for us.</span></div>
+        <div class="footer-tools"><button id="tour" class="quiet-button" type="button" aria-pressed="false">缓缓环游</button><button id="reset" class="quiet-button" type="button" aria-label="回到花园全景">回到初见 <span aria-hidden="true">↗</span></button></div>
+      </div>
+      <p id="explore-hint" class="explore-hint">听说，这里的东西不全是摆设。</p>
+    </div>
+    <button id="skip-intro" class="quiet-button" type="button" hidden>跳过开场 <span aria-hidden="true">↗</span></button>
+    <div id="object-hint" role="presentation" hidden></div>
+    <button id="return-view" class="return-view" type="button" hidden><span aria-hidden="true">←</span> 回到花园</button>
+    <p id="scene-error" class="scene-error" role="alert" hidden></p>
+    <span id="announcement" class="sr-only" role="status" aria-live="polite"></span>
+    <dialog id="memory-dialog" class="story-dialog" aria-labelledby="memory-title">
+      <section class="ribbon-surface story-surface">
+        <button class="close-story icon-button" type="button" aria-label="收起照片长卷"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <header class="story-heading"><span class="tiny-label">THE MEMORY RIBBON</span><h2 id="memory-title">让回忆，慢慢生长。</h2></header>
+        <div id="memory-content" class="memory-content"></div>
+        <footer class="ribbon-footer"><span class="two-dots" aria-hidden="true"><i></i><i></i></span><span>把日子收藏在这一段春天里。</span></footer>
+      </section>
+    </dialog>
+    <dialog id="letter-dialog" class="story-dialog" aria-labelledby="letter-title">
+      <section class="letter-surface story-surface">
+        <button class="close-story icon-button" type="button" aria-label="收好信纸"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        <header class="story-heading"><span class="tiny-label">LETTERS BETWEEN US</span><h2 id="letter-title">寄给彼此的春天</h2></header>
+        <div id="letter-content" class="letter-content"></div>
+        <footer class="letter-footer"><span class="identity-mark purple" aria-hidden="true"></span><span>一封一封，慢慢读。</span><span class="identity-mark green" aria-hidden="true"></span></footer>
+      </section>
+    </dialog>
+  </main>
+  <noscript><p class="scene-error">请开启浏览器的 JavaScript，再来打开这座花园。</p></noscript>
+  <script type="module">
+    import('/src/natural/engine.js').catch(error => {
+      document.querySelector('#loading').textContent='花园暂时没有打开，请重试。';
+      const button=document.querySelector('#enter');button.disabled=false;button.textContent='重新打开';button.onclick=()=>location.reload();console.error(error);
+    });
+  </script>
+</body>
+</html>

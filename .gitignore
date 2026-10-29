@@ -1,0 +1,8 @@
+node_modules/
+dist/
+work/
+.history/
+screenshots/*
+!screenshots/mother_tree_*.jpg
+*.log
+.DS_Store

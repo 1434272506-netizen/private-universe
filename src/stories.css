@@ -1,0 +1,44 @@
+/* Reading stays on the ribbon and paper already present in the garden. */
+#memory-content.has-memories{display:block;overflow:visible;min-width:0}
+.collection-note{margin:0 0 20px;font:12px/1.8 var(--chinese);color:var(--muted);letter-spacing:.06em}
+.memory-track{display:flex;gap:24px;overflow-x:auto;padding:7px 5px 20px;scroll-snap-type:x mandatory;scrollbar-width:thin;scrollbar-color:#b7bda7 transparent}
+.memory-track .memory-card{min-width:0;align-self:flex-start;transform:rotate(-1deg)}
+.memory-track .memory-card:nth-child(even){transform:rotate(1deg)}
+.memory-track .memory-card figcaption{overflow-wrap:anywhere;white-space:pre-wrap}
+.open-memory{display:block;width:100%;padding:0;border:0;background:transparent;text-align:inherit;transition:filter .2s}
+.open-memory:hover{filter:brightness(1.04)}
+.story-photograph{width:100%;min-width:0;background:#edf0e4;overflow:hidden}
+.photo-unavailable{min-height:210px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:25px 15px;color:var(--muted);font:14px/1.7 var(--chinese);border:1px dashed #9ba58a80}
+.photo-unavailable small{font:11px/1.7 var(--sans)}
+.story-reading-tools{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 23px}
+.story-back,.story-page-button{padding:9px 0;min-height:40px;border:0;border-bottom:1px solid transparent;background:transparent;font:12px/1.7 var(--chinese);letter-spacing:.03em;color:var(--muted)}
+.story-back:hover,.story-page-button:hover{color:var(--ink);border-bottom-color:var(--line)}
+.story-page-button:disabled{opacity:.35;cursor:default;border-bottom-color:transparent}
+.story-position{font:11px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
+.memory-reader{margin:0;min-width:0}
+.memory-reader .story-photograph{background:#e8ebdf}
+.memory-reader img{display:block;width:100%;height:auto;max-height:54vh;object-fit:contain}
+.memory-reader figcaption{font:15px/1.9 var(--chinese);white-space:pre-wrap;overflow-wrap:anywhere;padding:22px 1px 0}
+.story-date{font:11px/1.7 var(--sans);color:var(--muted);white-space:normal;overflow-wrap:anywhere}
+.memory-reader .story-date{display:block;margin-top:9px}
+.story-pagination{display:flex;justify-content:space-between;gap:25px;margin-top:14px}
+.envelope-list{display:grid;gap:17px}
+.letter-envelope{position:relative;display:flex;align-items:center;gap:19px;width:100%;min-width:0;min-height:116px;padding:23px 21px;border:1px solid #bcb49b73;background:linear-gradient(165deg,#fffdf5,#f4efdf);text-align:left;box-shadow:1px 4px 8px #4b4e3810;transition:transform .2s,border-color .2s}
+.letter-envelope::before{content:'';position:absolute;inset:6px;pointer-events:none;border:1px solid #c6bca12e}
+.letter-envelope:hover{transform:translateY(-2px);border-color:#978aab}
+.letter-seal{flex:0 0 22px;height:22px;border-radius:50%;background:#b2a0c4;box-shadow:inset 0 0 0 4px #a28fb34d}
+.letter-envelope[data-identity='green'] .letter-seal{background:#8eac81;box-shadow:inset 0 0 0 4px #6f925c4d}
+.envelope-description{display:flex;flex:1;min-width:0;flex-direction:column;gap:12px}
+.envelope-title{font:17px/1.6 var(--chinese);overflow-wrap:anywhere}
+.envelope-meta{display:flex;flex-wrap:wrap;column-gap:14px;row-gap:4px;font:11px/1.7 var(--sans);color:var(--muted);overflow-wrap:anywhere}
+.envelope-arrow{font:17px var(--serif);color:#7c866d}
+.single-letter{min-width:0;overflow-wrap:anywhere}
+.single-letter h3{font:400 24px/1.65 var(--chinese);letter-spacing:.04em;margin:30px 0 26px}
+.single-letter-body{white-space:pre-wrap;font:15px/2.2 var(--chinese);margin:0}
+.single-letter-signature{display:flex;flex-direction:column;align-items:flex-end;gap:7px;font:14px/1.8 var(--chinese);margin:35px 0 15px}
+@media(max-width:760px){
+  .memory-track{gap:18px}.memory-track .memory-card{flex-basis:235px}
+  .memory-reader img{max-height:48vh}.memory-reader figcaption{font-size:14px}
+  .letter-envelope{gap:13px;padding:20px 16px;min-height:108px}.envelope-title{font-size:15px}.letter-seal{flex-basis:18px;height:18px}
+  .single-letter h3{font-size:21px}.single-letter-body{font-size:14px}
+}
