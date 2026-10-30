@@ -1,5 +1,7 @@
 import {memories as suppliedMemories,letters as suppliedLetters} from './personal-content.js';
 import './stories.css';
+import {isLetterRead,markLetterRead,letterReadingKey} from './letter-reading.js';
+import './letter-reading.css';
 
 const records=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
 const contentText=value=>typeof value==='string'?value:typeof value==='number'?String(value):'';
@@ -208,23 +210,28 @@ function prepareLetters(root){
   function showEnvelopes(focus=false){
     current=-1;root.replaceChildren();
     const list=element('div','envelope-list');list.setAttribute('aria-label','信件列表');
-    letters.forEach((letter,index)=>{
+    const ordered=letters.map((letter,index)=>({letter,index,read:isLetterRead(letter)}))
+      .sort((a,b)=>Number(a.read)-Number(b.read)||(Date.parse(b.letter.date)||b.letter.createdAt||0)-(Date.parse(a.letter.date)||a.letter.createdAt||0)||a.index-b.index);
+    ordered.forEach(({letter,index,read})=>{
       const open=button('','letter-envelope',()=>{origin=index;showLetter(index);});
       open.dataset.identity=letter.identity==='green'?'green':'purple';
+      open.dataset.read=String(read);open.dataset.letterKey=letterReadingKey(letter);
       const seal=element('span','letter-seal');seal.setAttribute('aria-hidden','true');
       const description=element('span','envelope-description');
       description.append(element('span','envelope-title',contentText(letter.title)||'一封信'));
       const metadata=element('span','envelope-meta');
+      metadata.append(element('span','letter-reading-state',read?'已拆阅':'尚未拆阅'));
       if(contentText(letter.from))metadata.append(element('span',null,contentText(letter.from)));
       metadata.append(dateLabel(letter.date));description.append(metadata);
       const arrow=element('span','envelope-arrow','↗');arrow.setAttribute('aria-hidden','true');
       open.append(seal,description,arrow);list.append(open);
     });
-    root.append(element('p','collection-note','挑一封，慢慢拆开。'),list);resetScroll(dialog);
-    if(focus)list.querySelectorAll('button')[origin]?.focus({preventScroll:true});
+    root.append(element('p','collection-note','挑一封，慢慢拆开。'),element('p','mailbox-reading-note','先放还没拆过的信。拆阅状态只记在这台浏览器里。'),list);resetScroll(dialog);
+    if(focus)[...list.querySelectorAll('button')].find(item=>item.dataset.letterKey===letterReadingKey(letters[origin]))?.focus({preventScroll:true});
   }
   function showLetter(index){
     current=index;const letter=letters[index];root.replaceChildren();
+    const remembered=markLetterRead(letter);
     const toolbar=element('nav','story-reading-tools');toolbar.setAttribute('aria-label','信件阅读');
     const back=button('← 回到信件','story-back',()=>showEnvelopes(true));toolbar.append(back);
     const article=element('article','single-letter');article.dataset.identity=letter.identity==='green'?'green':'purple';
@@ -234,6 +241,7 @@ function prepareLetters(root){
     signature.append(mark,document.createTextNode(contentText(letter.from)?` ${contentText(letter.from)}`:''));
     footer.append(signature,dateLabel(letter.date));article.append(footer);
     root.append(toolbar,article);resetScroll(dialog);back.focus({preventScroll:true});
+    if(!remembered)root.append(element('p','letter-storage-note','信已打开，浏览器暂时未能保存拆阅记录。'));
   }
   installDetailEscape(dialog,()=>current>=0,()=>showEnvelopes(true));
   dialog.addEventListener('close',()=>showEnvelopes(),{signal:storyEvents.signal});showEnvelopes();

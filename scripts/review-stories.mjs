@@ -40,7 +40,7 @@ try{
   await check('Letters are selected from separate envelopes',async()=>{
     assert.equal(await page.locator('.letter-envelope').count(),2);
     assert.equal(await page.locator('.single-letter').count(),0);
-    await page.locator('.letter-envelope').first().click();
+    await page.locator('.letter-envelope').filter({hasText:fixtures.letters[0].title}).click();
     assert.equal(await page.locator('.single-letter').count(),1);
     assert.equal(await page.locator('.single-letter-body').textContent(),fixtures.letters[0].body);
   });
@@ -49,7 +49,7 @@ try{
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#letter-dialog').isVisible(),true);
     assert.equal(await page.locator('.letter-envelope').count(),2);
-    assert.equal(await page.locator('.letter-envelope').first().evaluate(el=>el===document.activeElement),true);
+    assert.equal(await page.locator('.letter-envelope').filter({hasText:fixtures.letters[0].title}).evaluate(el=>el===document.activeElement),true);
     await page.keyboard.press('Escape');await page.locator('#letter-dialog').waitFor({state:'hidden'});
   });
   await openPlace('ribbon');await page.locator('#memory-dialog').waitFor({state:'visible'});
@@ -73,7 +73,7 @@ try{
     await page.keyboard.press('Escape');await page.locator('#memory-dialog').waitFor({state:'hidden'});
   });
   await page.setViewportSize({width:390,height:844});
-  await openPlace('mailbox');await page.locator('.letter-envelope').nth(1).click();
+  await openPlace('mailbox');await page.locator('.letter-envelope').filter({hasText:fixtures.letters[1].title}).click();
   await check('Long letter and title fit a narrow screen; start and end remain reachable',async()=>{
     const bounds=await page.locator('.single-letter').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
     assert.ok(await page.locator('#letter-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));
@@ -83,7 +83,7 @@ try{
   });
   await page.screenshot({path:'screenshots/stories-fixture-long-letter-390.png'});
   await page.keyboard.press('Escape');
-  assert.ok(await page.locator('.letter-envelope').nth(1).evaluate(el=>el===document.activeElement));
+  assert.ok(await page.locator('.letter-envelope').filter({hasText:fixtures.letters[1].title}).evaluate(el=>el===document.activeElement));
   await closeDialog('letter-dialog');await openPlace('ribbon');await goToPhotoPage(page,2,3);
   await check('Portrait photo remains readable at 390px without horizontal overflow',async()=>{
     assert.ok(await page.locator('#memory-dialog').evaluate(el=>el.scrollWidth<=el.clientWidth));

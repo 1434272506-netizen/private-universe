@@ -1,0 +1,10 @@
+#help-panel{max-height:calc(100dvh - 104px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.help-places button{min-height:44px}
+.story-dialog .close-story{min-height:44px;min-width:44px}
+.saved-actions button{min-height:40px}
+#placement-hint{position:absolute;z-index:7;left:50%;bottom:94px;transform:translateX(-50%);display:flex;align-items:center;gap:18px;max-width:calc(100vw - 38px);padding:14px 19px;background:#faf9f0ee;border:1px solid #84917355;box-shadow:0 8px 24px #25352c18;color:var(--ink);font:12px/1.8 var(--sans)}
+#placement-hint p{margin:0;overflow-wrap:anywhere}
+#placement-hint button{flex:none;min-height:40px;padding:4px 8px;border:0;border-bottom:1px solid var(--line);background:transparent;font:12px var(--sans)}
+#app>canvas[data-placing]{cursor:crosshair}
+@media(max-width:760px){#placement-hint{bottom:90px;width:max-content;gap:10px;font-size:11px;padding:12px 14px}}
+@media(max-width:360px){#help-panel{top:110px;max-height:calc(100dvh - 130px)}}

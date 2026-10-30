@@ -1,0 +1,8 @@
+.mailbox-reading-note{margin:0 0 20px;color:var(--muted);font:11px/1.8 var(--sans);overflow-wrap:anywhere}
+.letter-envelope[data-read='false']{border-color:#a99ab477;box-shadow:1px 4px 8px #4b4e3810,inset 3px 0 #aa99ba80}
+.letter-envelope[data-read='true'] .envelope-title{color:#687768}
+.letter-reading-state{display:inline-flex;align-items:center;gap:6px;color:#857196;font:10px/1.6 var(--sans)}
+.letter-reading-state::before{content:'';width:4px;height:4px;border-radius:50%;background:currentColor}
+.letter-envelope[data-read='true'] .letter-reading-state{color:var(--muted)}
+.letter-envelope[data-read='true'] .letter-reading-state::before{display:none}
+.letter-storage-note{margin:12px 0 0;color:#8a644e;font:11px/1.8 var(--sans)}

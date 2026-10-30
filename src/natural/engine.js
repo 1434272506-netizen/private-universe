@@ -10,6 +10,11 @@ import {makeLighting} from './lighting.js';
 import {loadCenterpieceTree} from './loveTree.js';
 import {presentRibbon} from '../ribbon-transition.js';
 import {prepareContentEditor} from '../content-editor.js';
+import {prepareGardenAudio} from '../garden-audio.js';
+import {prepareSurprises} from '../surprises.js';
+import {createSurpriseWorld} from './surprises.js';
+import {makeListeningPlayer} from './listening-player.js';
+import '../local-garden.css';
 
 const $=selector=>document.querySelector(selector);
 const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
@@ -48,6 +53,17 @@ $('#loading').textContent='春风经过树梢，花园就快醒来了。';
 const treeAsset=await loadCenterpieceTree(island,time);
 const statistics={...makePlants(island,time,{includeTree:false}),...treeAsset.statistics};
 const waterStatistics=makeWater(island,time),props=makeProps(island,time);
+const surpriseWorld=createSurpriseWorld(island,time,{ground,reducedMotion:()=>reducedMotion});
+const archiveBook=props.bench.getObjectByName('linen-memory-book');
+if(archiveBook)archiveBook.userData.interaction='archive';
+const listeningPlayer=makeListeningPlayer(props.bench);
+let archivePetal;
+if(archiveBook){
+  archivePetal=new THREE.Mesh(new THREE.SphereGeometry(.028,8,6),new THREE.MeshStandardMaterial({color:'#b4a3c4',roughness:1}));
+  archivePetal.name='new-archive-petal';archivePetal.scale.set(.6,.16,1);archivePetal.position.set(.19,.083,.07);archivePetal.visible=false;archiveBook.add(archivePetal);
+  for(const name of ['lavender-bookmark','green-bookmark']){const mark=archiveBook.getObjectByName(name);if(mark)mark.visible=false;}
+}
+for(const balloon of props.balloons)balloon.userData.interaction='create-surprise';
 for(const [x,y,z,scale] of [[-34,-20,-50,.32],[21,-24,-68,.25]]){
   const distant=makeLand(scene,{detail:'distant'});distant.name='distant-island';
   distant.scale.setScalar(scale);distant.position.set(x,y,z);
@@ -97,6 +113,8 @@ let currentView='hero',flight=null,intro=null,savedView=null,pendingStory=null,a
 let shadowUntil=0,hintUntil=0,closing=false;
 let ribbonPresentation=null;
 let contentEditorOpen=false;
+let pendingPlacement=null;
+const auxiliaryPanels=new Set();
 let sceneFrameRequested=true,overlayRenderPaused=false,overlayReadyAt=0,stableCameraFrames=0,renderCount=0;
 const renderedPosition=camera.position.clone(),renderedTarget=controls.target.clone(),renderedRotation=camera.quaternion.clone();
 function requestSceneFrame(){sceneFrameRequested=true;}
@@ -106,6 +124,14 @@ function setPhase(next){phase=next;app.dataset.phase=next;canvasUI.inert=next!==
 function setTour(active){controls.autoRotate=active&&!reducedMotion;$('#tour').setAttribute('aria-pressed',String(controls.autoRotate));$('#tour').textContent=controls.autoRotate?'停在此刻':'缓缓环游';}
 function hideHint(){$('#object-hint').hidden=true;delete canvas.dataset.hover;}
 function closeHelp(){$('#help-panel').hidden=true;$('#help-toggle').setAttribute('aria-expanded','false');}
+function openPanel(name){
+  auxiliaryPanels.add(name);contentEditorOpen=true;overlayReadyAt=performance.now();requestSceneFrame();
+  closeHelp();hideHint();setTour(false);pendingStory=null;controls.enabled=false;
+}
+function closePanel(name){
+  auxiliaryPanels.delete(name);contentEditorOpen=auxiliaryPanels.size>0;requestSceneFrame();
+  controls.enabled=phase==='exploring'&&!activeDialog&&!contentEditorOpen;
+}
 function caption(which){
   app.dataset.view=which;
   const preset=presets[which];
@@ -161,6 +187,7 @@ function enter(direct=false){
 }
 function snapshot(){return {position:camera.position.clone(),target:controls.target.clone(),min:controls.minDistance,view:currentView,width:innerWidth,height:innerHeight};}
 function returnToGarden(){
+  if(pendingPlacement){finishPlacement(null);return;}
   if(activeDialog){closeStory();return;}
   pendingStory=null;activePlace=null;props.setMailboxOpen(false,{immediate:reducedMotion});shadowUntil=elapsed+1.7;hideHint();
   $('#return-view').hidden=true;controls.enabled=true;
@@ -183,7 +210,14 @@ function showStory(kind){
   dialog.querySelector('.close-story').focus({preventScroll:true});
 }
 function discover(kind){
-  if(!Object.hasOwn(anchors,kind)||phase!=='exploring'||activeDialog||closing||contentEditorOpen)return;
+  if(phase!=='exploring'||activeDialog||closing||contentEditorOpen||pendingPlacement)return;
+  if(kind==='sound'){closeHelp();hideHint();setTour(false);gardenAudio.open();return;}
+  if(kind==='archive'||kind==='create-surprise'||kind.startsWith('surprise:')){
+    closeHelp();hideHint();setTour(false);
+    surprises.open(kind==='archive'?'archive':kind==='create-surprise'?'create':'surprise',kind.startsWith('surprise:')?kind.slice(9):undefined);
+    return;
+  }
+  if(!Object.hasOwn(anchors,kind))return;
   closeHelp();hideHint();setTour(false);pendingStory=null;$('#explore-hint').classList.remove('is-visible');
   savedView??=snapshot();activePlace=kind;$('#return-view').hidden=false;
   const which=kind==='ribbon'?'tree':kind,preset=presets[which];currentView=which;caption(which);
@@ -206,9 +240,34 @@ async function closeStory(){
 prepareStories();
 prepareContentEditor({
   onChange:prepareStories,
-  onOpen:()=>{contentEditorOpen=true;overlayReadyAt=performance.now();requestSceneFrame();closeHelp();hideHint();setTour(false);pendingStory=null;controls.enabled=false;},
-  onClose:()=>{contentEditorOpen=false;requestSceneFrame();controls.enabled=phase==='exploring'&&!activeDialog;}
+  onOpen:()=>openPanel('content'),onClose:()=>closePanel('content')
 });
+const gardenAudio=prepareGardenAudio({onOpen:()=>openPanel('sound'),onClose:()=>closePanel('sound')});
+const surprises=prepareSurprises({
+  onOpen:()=>openPanel('surprises'),onClose:()=>closePanel('surprises'),requestPlacement,
+  onWorldChange:(records,event)=>{
+    surpriseWorld.sync(records,event);
+    if(archiveBook){
+      const archived=records.filter(record=>record.status==='archived');archiveBook.userData.hasNewArchives=archived.some(record=>!record.archiveSeenAt);
+      archivePetal.visible=archiveBook.userData.hasNewArchives;
+      for(const [owner,name] of [['purple','lavender-bookmark'],['green','green-bookmark']]){const mark=archiveBook.getObjectByName(name);if(mark)mark.visible=archived.some(record=>record.bookmarks?.[owner]);}
+    }
+    requestSceneFrame();
+  }
+});
+const placementHint=document.createElement('aside');placementHint.id='placement-hint';placementHint.hidden=true;placementHint.setAttribute('role','status');
+const placementText=document.createElement('p');placementText.textContent='轻点草地，放下这份惊喜。拖动仍可环绕花园。';
+const placementCancel=document.createElement('button');placementCancel.type='button';placementCancel.textContent='取消选址';placementCancel.addEventListener('click',()=>finishPlacement(null));
+placementHint.append(placementText,placementCancel);app.append(placementHint);
+function requestPlacement(callback){
+  pendingPlacement=callback;closeHelp();hideHint();setTour(false);pendingStory=null;flight=null;controls.enableDamping=true;controls.enabled=true;
+  canvasUI.inert=true;placementHint.hidden=false;canvas.dataset.placing='true';canvas.focus({preventScroll:true});
+  announce('轻点主岛的草地选择气球位置，按 Esc 取消。');requestSceneFrame();
+}
+function finishPlacement(point){
+  const callback=pendingPlacement;pendingPlacement=null;placementHint.hidden=true;delete canvas.dataset.placing;
+  canvasUI.inert=phase!=='exploring';callback?.(point);requestSceneFrame();
+}
 for(const dialog of document.querySelectorAll('.story-dialog')){
   dialog.querySelector('.close-story').addEventListener('click',closeStory);
   dialog.addEventListener('cancel',event=>{event.preventDefault();closeStory();});
@@ -241,6 +300,7 @@ $('#fullscreen').addEventListener('click',async()=>{
 });
 document.addEventListener('fullscreenchange',()=>{$('#fullscreen').setAttribute('aria-label',document.fullscreenElement?'退出全屏':'进入全屏');requestSceneFrame();});
 window.addEventListener('keydown',event=>{
+  if(pendingPlacement&&event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();finishPlacement(null);return;}
   if(contentEditorOpen)return;
   if(event.target instanceof HTMLElement&&(/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable))return;
   if(event.key==='Escape'){
@@ -259,12 +319,12 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestSce
 // Direct picking uses the real meshes. A small screen-space tolerance makes
 // the delicate ribbon reachable without introducing permanent floating labels.
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
-const interactive=[ribbon,props.mailbox,props.bench].filter(Boolean);
+const interactive=[ribbon,props.mailbox,props.bench,...props.balloons].filter(Boolean);
 const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),...treeAsset.trunkMeshes].filter(Boolean);
 function pick(clientX,clientY){
-  if(phase!=='exploring'||activeDialog||flight||intro||contentEditorOpen)return null;
+  if(phase!=='exploring'||activeDialog||flight||intro||contentEditorOpen||pendingPlacement)return null;
   mouse.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
-  const hit=raycaster.intersectObjects(interactive,true)[0];
+  const hit=raycaster.intersectObjects([...interactive,...surpriseWorld.objects],true)[0];
   if(hit){
     const block=raycaster.intersectObjects(occluders,false)[0];
     if(!block||block.distance>hit.distance-.15){
@@ -273,7 +333,10 @@ function pick(clientX,clientY){
     }
   }
   let closest=null,distance=28;
-  for(const [kind,anchor] of Object.entries(anchors)){
+  const extraAnchors=surpriseWorld.objects.map(object=>[object.userData.interaction,object.getWorldPosition(new THREE.Vector3())]);
+  if(archiveBook)extraAnchors.push(['archive',archiveBook.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.05,0))]);
+  extraAnchors.push(['sound',listeningPlayer.getWorldPosition(new THREE.Vector3()).add(new THREE.Vector3(0,.06,0))]);
+  for(const [kind,anchor] of [...Object.entries(anchors),...extraAnchors]){
     const p=anchor.clone().project(camera);if(p.z<0||p.z>1)continue;
     const d=Math.hypot((p.x*.5+.5)*innerWidth-clientX,(-p.y*.5+.5)*innerHeight-clientY);
     if(d>=distance)continue;
@@ -290,12 +353,21 @@ canvas.addEventListener('pointermove',event=>{
   if(pressed&&Math.hypot(event.clientX-pressed.x,event.clientY-pressed.y)>6)pressed.moved=true;
   if(event.buttons){hideHint();return;}
   const kind=pick(event.clientX,event.clientY);if(!kind){hideHint();return;}
-  const hint=$('#object-hint');hint.textContent={ribbon:'轻轻展开白丝带',mailbox:'这里，有一只信箱',bench:'坐一会儿'}[kind];
+  const hint=$('#object-hint');hint.textContent=kind.startsWith('surprise:')?'风里藏着一点惊喜':{ribbon:'轻轻展开白丝带',mailbox:'这里，有一只信箱',bench:'坐一会儿',archive:archiveBook?.userData.hasNewArchives?'册子里，多了一页收藏':'翻翻长椅上的册子',sound:'听听风和溪水','create-surprise':'留一点小惊喜'}[kind];
   hint.style.left=`${Math.min(event.clientX+18,innerWidth-170)}px`;hint.style.top=`${Math.max(12,event.clientY-37)}px`;hint.hidden=false;canvas.dataset.hover=kind;
 });
 canvas.addEventListener('pointerup',event=>{
   const start=pressed;pressed=null;
-  if(start&&start.id===event.pointerId&&!start.moved&&event.button===0){const kind=pick(event.clientX,event.clientY);if(kind)discover(kind);}
+  if(start&&start.id===event.pointerId&&!start.moved&&event.button===0){
+    if(pendingPlacement){
+      mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
+      const earth=occluders.filter(object=>!treeAsset.trunkMeshes.includes(object));
+      const hit=raycaster.intersectObjects(earth,false).find(hit=>hit.face?.normal.clone().transformDirection(hit.object.matrixWorld).y>.45&&Math.abs(hit.point.y-ground(hit.point.x,hit.point.z))<.25);
+      if(hit)finishPlacement({x:hit.point.x,z:hit.point.z});else announce('这里没有可放置的草地，请轻点主岛的上表面。');
+      return;
+    }
+    const kind=pick(event.clientX,event.clientY);if(kind)discover(kind);
+  }
 });
 canvas.addEventListener('pointercancel',()=>{pressed=null;hideHint();});
 canvas.addEventListener('pointerleave',hideHint);
@@ -311,10 +383,11 @@ function animate(now){
   // scene clock still as well, so returning never jumps ahead through the wind.
   const covered=Boolean(activeDialog?.open||contentEditorOpen);
   overlayRenderPaused=ready&&covered&&!closing&&!flight&&!intro&&!pendingStory
-    &&performance.now()>=overlayReadyAt&&elapsed>=shadowUntil&&stableCameraFrames>=2&&!sceneFrameRequested;
+    &&performance.now()>=overlayReadyAt&&elapsed>=shadowUntil&&stableCameraFrames>=2&&!sceneFrameRequested&&!surpriseWorld.flying;
   if(overlayRenderPaused)return;
   elapsed+=delta;time.value=reducedMotion?0:elapsed;
   props.update(reducedMotion?0:elapsed);atmosphere.update?.(reducedMotion?0:elapsed);
+  surpriseWorld.update(elapsed);
   if(shadowUntil>elapsed)renderer.shadowMap.needsUpdate=true;
   if(intro){
     const t=Math.min(1,(elapsed-intro.start)/intro.duration),s=ease(t);
@@ -362,4 +435,4 @@ motionQuery.addEventListener('change',event=>{
   if(reducedMotion)props.setMailboxOpen(props.mailbox.userData.open,{immediate:true});
   if(reducedMotion){setTour(false);if(intro)finishIntro(false);if(flight){const f=flight;moveTo(f.to,f.toTarget,{duration:0,min:controls.minDistance,done:f.done});}}
 });
-if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;},get overlayRenderPaused(){return overlayRenderPaused;},get renderCount(){return renderCount;},get sceneTime(){return elapsed;}};
+if(import.meta.env.DEV)window.__PU={camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,surpriseWorld,surprises,gardenAudio,listeningPlayer,archiveBook,get placementPending(){return Boolean(pendingPlacement);},get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;},get overlayRenderPaused(){return overlayRenderPaused;},get renderCount(){return renderCount;},get sceneTime(){return elapsed;}};

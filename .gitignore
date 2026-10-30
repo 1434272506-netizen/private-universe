@@ -3,6 +3,7 @@ node_modules/
 __pycache__/
 dist/
 work/
+/out/
 .history/
 /preview-v0.1.png
 screenshots/*

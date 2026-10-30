@@ -143,7 +143,7 @@ export async function loadLocalContent(){
       const image=URL.createObjectURL(record.photo);nextURLs.push(image);
       return {id:record.id,image,caption:record.caption,alt:record.alt,date:record.date};
     });
-    const letters=records.letters.sort(byCreated).map(({id,title,body,from,date,identity})=>({id,title,body,from,date,identity}));
+    const letters=records.letters.sort(byCreated).map(({id,title,body,from,date,identity,createdAt})=>({id,title,body,from,date,identity,createdAt}));
     for(const url of currentImageURLs)URL.revokeObjectURL(url);
     currentImageURLs=nextURLs;
     return {memories,letters};
