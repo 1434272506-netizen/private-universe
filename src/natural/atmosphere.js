@@ -8,9 +8,9 @@ export function makeAtmosphere(scene, renderer, time) {
     side: THREE.BackSide, depthWrite: false, toneMapped: false,
     uniforms: {
       uTime: time,
-      uZenith: {value: new THREE.Color('#79aacb')},
-      uHorizon: {value: new THREE.Color('#c3d3d9')},
-      uLower: {value: new THREE.Color('#d7dfd7')},
+      uZenith: {value: new THREE.Color('#86b9d8')},
+      uHorizon: {value: new THREE.Color('#f1e6cc')},
+      uLower: {value: new THREE.Color('#e6e9d9')},
     },
     vertexShader: `varying vec3 vDirection;
       void main() { vDirection=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
@@ -34,8 +34,8 @@ export function makeAtmosphere(scene, renderer, time) {
         // gradient into that visible lower hemisphere instead of leaving it flat.
         vec3 color=mix(uHorizon,uZenith,smoothstep(-.72,.60,d.y));
         color=mix(color,uLower,1.0-smoothstep(-.96,-.46,d.y));
-        float sun=max(dot(d,normalize(vec3(-.7,.62,.4))),0.0);
-        color+=vec3(.048,.032,.012)*pow(sun,6.0);
+        float sun=max(dot(d,normalize(vec3(-11.0,10.5,7.5))),0.0);
+        color+=vec3(.085,.052,.015)*pow(sun,6.0);
         vec2 p=d.xz/max(.25,d.y+.43)*2.1+vec2(uTime*.0009,0.0);
         float vapor=fbm(p*1.7+3.0);
         float highCloud=smoothstep(.54,.77,vapor)*smoothstep(-.20,.25,d.y)*.17;
@@ -50,7 +50,7 @@ export function makeAtmosphere(scene, renderer, time) {
   sky.name='spring-sky';
   sky.renderOrder=-20;
   scene.add(sky);
-  if(scene.fog)scene.fog.color.set('#d0e1e7');
+  if(scene.fog)scene.fog.color.set('#e4ebdf');
 
   const random=rng(80135),textures=[0,1,2].map(cloudTexture);
   const clouds=new THREE.Group(),drifters=[];
@@ -89,7 +89,7 @@ export function makeAtmosphere(scene, renderer, time) {
   const pmrem=new THREE.PMREMGenerator(renderer);
   const environment=pmrem.fromScene(environmentScene,.08,.1,100);
   scene.environment=environment.texture;
-  scene.environmentIntensity=.35;
+  scene.environmentIntensity=.28;
   pmrem.dispose();
   return {
     sky,clouds,environment,

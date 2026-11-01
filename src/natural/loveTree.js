@@ -32,13 +32,14 @@ export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BA
       for(const material of materials){
         material.alphaTest=.45;material.transparent=false;material.depthWrite=true;
         material.side=THREE.DoubleSide;material.roughness=.88;
+        material.color.multiply(new THREE.Color().setRGB(1.04,1.035,.96));
         if(object.geometry.attributes.uv)injectLeafShader(material,time);
       }
     }else{
       trunkMeshes.push(object);
       for(const material of materials){
         material.roughness=.95;
-        material.color.multiply(new THREE.Color().setRGB(.78,.70,.59));
+        material.color.multiply(new THREE.Color().setRGB(.82,.71,.57));
       }
     }
   });
@@ -65,12 +66,17 @@ function injectLeafShader(material,time){
       `);
     shader.fragmentShader=shader.fragmentShader.replace('#include <opaque_fragment>',`
       #if NUM_DIR_LIGHTS > 0
-        float throughLight=pow(max(dot(-normal,directionalLights[0].direction),0.0),1.6);
-        outgoingLight+=diffuseColor.rgb*directionalLights[0].color*throughLight*.055;
+        // Wrapped transmission admits light through thin, two-sided leaves.
+        // Forward scattering increases toward the sun rather than flattening
+        // the whole canopy with a constant emissive lift.
+        float throughLight=pow(clamp((dot(-normal,directionalLights[0].direction)+.3)/1.3,0.0,1.0),1.25);
+        float forwardScatter=pow(max(dot(-geometryViewDir,directionalLights[0].direction),0.0),3.0);
+        outgoingLight+=diffuseColor.rgb*directionalLights[0].color
+          *vec3(.12,.16,.05)*throughLight*(.45+.55*forwardScatter);
       #endif
-      outgoingLight+=diffuseColor.rgb*vec3(.035,.047,.018);
+      outgoingLight+=diffuseColor.rgb*vec3(.028,.040,.012);
       #include <opaque_fragment>
     `);
   };
-  material.customProgramCacheKey=()=> 'love-tree-leaves-v1';
+  material.customProgramCacheKey=()=> 'love-tree-leaves-spring-v2';
 }

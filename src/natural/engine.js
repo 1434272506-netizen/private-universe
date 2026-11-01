@@ -21,7 +21,7 @@ const app=$('#app'),canvasUI=$('#garden-ui'),invitation=$('#invitation');
 const motionQuery=matchMedia('(prefers-reduced-motion: reduce)');
 let reducedMotion=motionQuery.matches;
 const time={value:0},scene=new THREE.Scene();
-scene.fog=new THREE.FogExp2('#d0e1e7',.0045);
+scene.fog=new THREE.FogExp2('#e4ebdf',.0040);
 const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
 renderer.setSize(innerWidth,innerHeight);
@@ -39,14 +39,14 @@ const controls=new OrbitControls(camera,canvas);
 Object.assign(controls,{enabled:false,enableDamping:true,dampingFactor:.065,enablePan:false,minDistance:13,maxDistance:55,minPolarAngle:.24,maxPolarAngle:1.38,rotateSpeed:.42,zoomSpeed:.6,autoRotateSpeed:.16});
 
 const atmosphere=makeAtmosphere(scene,renderer,time);
-scene.add(new THREE.HemisphereLight('#eaf0e9','#657651',1.05));
-const sun=new THREE.DirectionalLight('#fff0d9',3.15);
-sun.position.set(-9,14,8);sun.castShadow=true;
+scene.add(new THREE.HemisphereLight('#edf4fa','#60734c',.92));
+const sun=new THREE.DirectionalLight('#ffe5c4',3.65);
+sun.position.set(-11,10.5,7.5);sun.castShadow=true;
 sun.shadow.mapSize.set(4096,4096);
 Object.assign(sun.shadow.camera,{left:-13,right:13,top:12,bottom:-12,near:1,far:48});
 sun.shadow.normalBias=.018;sun.shadow.bias=-.00012;sun.shadow.radius=3;
 scene.add(sun);
-const fill=new THREE.DirectionalLight('#d3e3ed',.40);fill.position.set(6,3,-8);scene.add(fill);
+const fill=new THREE.DirectionalLight('#d3e3ed',.28);fill.position.set(6,3,-8);scene.add(fill);
 
 const island=makeLand(scene);
 $('#loading').textContent='春风经过树梢，花园就快醒来了。';
