@@ -99,6 +99,7 @@ const anchors={
   bench:props.bench.position.clone().add(new THREE.Vector3(0,.7,0))
 };
 const presets={
+  sky:{target:[-14,17,18],position:[3,2.3,6],min:8,title:'抬头，云正经过太阳。',note:'A little closer to the sky.'},
   tree:{target:[-3.4,2.5,.1],position:[-.3,4.3,9.3],min:6.8,title:'记忆，系在枝头。',note:'The memory ribbon.'},
   mailbox:{target:[4.65,1.65,-1.9],position:[6.2,3.25,3.9],min:4.3,title:'写给彼此的春天。',note:'Letters between us.'},
   bench:{target:[-3.6,.8,-2.6],position:[4.2,ground(4.2,1.5)+1.28,2.7],min:7,title:'坐一会儿，春天还很长。',note:'Stay a little longer.'},
@@ -151,7 +152,7 @@ function fitPosition(which='hero'){
 }
 function moveTo(position,lookAt,{duration=1.65,min=13,done=null}={}){
   controls.enableDamping=false;controls.update();
-  const limits={minDistance:min,maxPolarAngle:currentView==='bench'?1.46:1.38,maxDistance:Math.max(55,position.distanceTo(lookAt)*1.12)};
+  const limits={minDistance:min,maxPolarAngle:currentView==='sky'?2.5:currentView==='bench'?1.46:1.38,maxDistance:Math.max(55,position.distanceTo(lookAt)*1.12)};
   const finish=()=>{Object.assign(controls,limits);controls.enableDamping=true;done?.();};
   if(reducedMotion||duration===0){
     flight=null;camera.position.copy(position);controls.target.copy(lookAt);Object.assign(controls,limits);controls.update();finish();
@@ -211,6 +212,10 @@ function showStory(kind){
 }
 function discover(kind){
   if(phase!=='exploring'||activeDialog||closing||contentEditorOpen||pendingPlacement)return;
+  if(kind==='sky'){
+    closeHelp();hideHint();setTour(false);savedView??=snapshot();activePlace='sky';
+    $('#return-view').hidden=false;frame('sky',true);announce('抬头看太阳和云，点回到初见可返回。');return;
+  }
   if(kind==='sound'){closeHelp();hideHint();setTour(false);gardenAudio.open();return;}
   if(kind==='archive'||kind==='create-surprise'||kind.startsWith('surprise:')){
     closeHelp();hideHint();setTour(false);
@@ -287,6 +292,8 @@ $('#tour').addEventListener('click',()=>{
   controls.enableDamping=true;setTour(!controls.autoRotate);
 });
 $('#help-toggle').addEventListener('click',()=>{const panel=$('#help-panel');panel.hidden=!panel.hidden;$('#help-toggle').setAttribute('aria-expanded',String(!panel.hidden));});
+const skyButton=document.createElement('button');skyButton.type='button';skyButton.dataset.place='sky';skyButton.textContent='抬头看看天空 ↗';
+$('#help-panel .help-places').append(skyButton);
 document.querySelectorAll('[data-place]').forEach(button=>button.addEventListener('click',()=>discover(button.dataset.place)));
 $('#replay').addEventListener('click',()=>{
   closeHelp();savedView=null;pendingStory=null;activePlace=null;flight=null;setTour(false);props.setMailboxOpen(false,{immediate:reducedMotion});shadowUntil=elapsed+1.6;
