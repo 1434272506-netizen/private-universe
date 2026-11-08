@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import {fireflies} from './fireflies.js';
 import {celestial} from './celestial.js';
 import {fairyLights} from './fairy-lights.js';
-
 import {shootingStars} from './shooting-stars.js';
+import {makeAurora} from './aurora.js';
+import {makeVolumetricBeams} from './volumetric-beams.js';
 
 export function benchAtmosphere(scene, atmosphere, sun, hemi, fill, time, anchor, renderer){
   const flies=fireflies(time), stars=celestial(time), bulbs=fairyLights(time,anchor);
-  scene.add(flies,stars,bulbs);
+  const aurora=makeAurora(time), beams=makeVolumetricBeams(time);
+  scene.add(flies,stars,bulbs,aurora.mesh,beams.group);
   const u=atmosphere.sky.material.uniforms;
   const updateMeteor=shootingStars(scene);
   const water=scene.getObjectByName('creek-surface').material.userData.currentUniforms;
@@ -25,6 +27,7 @@ export function benchAtmosphere(scene, atmosphere, sun, hemi, fill, time, anchor
   color(fill.color,'#d3e3ed','#a5728a','#233854');
   color(scene.fog.color,'#d8e4e7','#a86c6a','#0b121e');
   color(water.uGlintColor.value,'#fffbed','#ff9944','#38bdf8');
+  color(beams.uniforms.uColor.value,'#fff2cf','#ff9944','#fff2cf');
   channel([3.65,2.95,.65],v=>sun.intensity=v);
   channel([.92,.85,.45],v=>hemi.intensity=v);
   channel([.28,.35,.2],v=>fill.intensity=v);
@@ -40,6 +43,14 @@ export function benchAtmosphere(scene, atmosphere, sun, hemi, fill, time, anchor
   for(const [obj,levels] of [[flies,[0,.25,.95]],[stars,[0,0,1]],[bulbs,[0,.08,1]]]){
     channel(levels,v=>{obj.material.uniforms.opacity.value=v;obj.visible=v>.001;});
   }
+  channel([0,0,.95],v=>{
+    aurora.uniforms.uOpacity.value=v;
+    aurora.mesh.visible=v>.001;
+  });
+  channel([.85,.25,0],v=>{
+    beams.uniforms.uOpacity.value=v;
+    beams.group.visible=v>.001;
+  });
   const panel=document.querySelector('#atmosphere-switcher');
   let weights=[1,0,0],from=weights.slice(),goal=0,start=0,duration=0;
   function apply(){
@@ -61,11 +72,15 @@ export function benchAtmosphere(scene, atmosphere, sun, hemi, fill, time, anchor
     start=performance.now();duration=matchMedia('(prefers-reduced-motion: reduce)').matches?300:1800;
     for(const b of panel.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b===button));
   });
-  return {update(now,delta,reducedMotion){
-    updateMeteor(delta,u.night.value,reducedMotion);
-    if(!duration)return;
-    const t=Math.min(1,(now-start)/duration),ease=t*t*(3-2*t);
-    weights=from.map((v,i)=>THREE.MathUtils.lerp(v,Number(i===goal),ease));apply();
-    if(t===1)duration=0;
-  }};
+  return {
+    aurora,
+    beams,
+    update(now,delta,reducedMotion){
+      updateMeteor(delta,u.night.value,reducedMotion);
+      if(!duration)return;
+      const t=Math.min(1,(now-start)/duration),ease=t*t*(3-2*t);
+      weights=from.map((v,i)=>THREE.MathUtils.lerp(v,Number(i===goal),ease));apply();
+      if(t===1)duration=0;
+    }
+  };
 }

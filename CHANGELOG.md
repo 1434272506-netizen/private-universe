@@ -4,6 +4,31 @@
 
 ---
 
+## [1.3.0] - 2026-11-08
+
+### 🚀 新增特性 (Features)
+- **翡翠紫晶极光天幕 (Emerald & Amethyst Boreal Aurora)**：
+  - 复用 GitHub 顶流开源项目 `candpixie/gliss` 与 `nimitz`'s "Auroras" (`XtGGRt`) 算法。
+  - 基于三频程序化三角波噪声（Tri-Noise）与 `mm2` 旋转矩阵，0MB 外部贴图，纯 GPU 数学渲染起伏丝幔与微澜。
+  - 绑定专属命定双星色谱：底部为代表她的翡翠碧绿 (`#10b981`)，顶部为代表你的紫罗兰晶紫 (`#c084fc`)，强折叠处迸发纯白高温光冕。
+  - 自动无缝接入 `benchAtmosphere` 氛围系统：在深夜（Night）平滑过渡点亮，为夜幕地平线注入深空神圣之美。
+- **晨曦丁达尔神圣光束 (Crepuscular Volumetric Beams)**：
+  - 复用 GitHub 顶流开源项目 `TrentSterling/threejs-volumetric-beam` 与 Passivestar 算法。
+  - 采用极简圆柱体看板与菲涅尔视线边缘软化（Fresnel Falloff），无需昂贵的全屏后处理光线步进，保持 60 FPS 丝滑性能。
+  - 3 束温润暖金（`#fff2cf`）体积光柱穿透中心母树枝桠，倾泻在春日草甸、长椅与小溪水面上，伴随程序化浮尘微粒（Drifting Dust Motes）。
+  - 联动昼夕夜三态：春日暖阳（Day）全开，蜜桃晚霞（Sunset）渐变为暖橙微光，深夜（Night）自然隐退。
+
+### 🧪 工程与测试基建 (Testing & Infrastructure)
+- **新增全流程专项评测脚本**：
+  - `scripts/review-aurora-and-beams.mjs`：验证昼间丁达尔光束激活、夜间极光天幕点亮、平滑过渡及 0 报错。
+- **生成双态实机截图**：
+  - `screenshots/04-crepuscular-godrays-day.png`：记录母树春日暖阳下的丁达尔神圣光柱。
+  - `screenshots/05-aurora-borealis-night.png`：记录长椅夜幕下北天长卷的翡翠紫晶双色极光。
+- **全量回归保障**：
+  - 项目全套 20 项端到端与集成测试 100% 全部通过（PASS），保持零控制台错误与零显存泄漏。
+
+---
+
 ## [1.2.0] - 2026-11-08
 
 ### 🚀 新增特性 (Features)
