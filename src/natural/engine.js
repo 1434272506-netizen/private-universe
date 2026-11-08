@@ -1,6 +1,9 @@
 import {makeCreekEcology} from './creek-ecology.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {makeCreekChimes} from './chimes-audio.js';
+import {makeStargazing} from './constellations.js';
+import {makeMilestone} from './anniversary-milestone.js';
 import {makeLand,ground,creekX,WATER_END} from './land.js';
 import {makePlants,makeMeadowEcology} from './plants.js';
 import {createButterflies} from './butterflies.js';
@@ -183,9 +186,9 @@ function fitPosition(which='hero'){
   }
   return target.clone().addScaledVector(dir,distance);
 }
-function moveTo(position,lookAt,{duration=1.65,min=13,done=null}={}){
+function moveTo(position,lookAt,{duration=1.65,min=13,cosine=false,done=null}={}){
   controls.enableDamping=false;controls.update();
-  const limits={minDistance:min,maxPolarAngle:currentView==='sky'?2.5:currentView==='bench'?1.46:1.38,maxDistance:Math.max(55,position.distanceTo(lookAt)*1.12)};
+  const limits={minDistance:min,maxPolarAngle:gazing.active?Math.PI:currentView==='sky'?2.5:currentView==='bench'?1.46:1.38,maxDistance:Math.max(55,position.distanceTo(lookAt)*1.12)};
   const finish=()=>{Object.assign(controls,limits);controls.enableDamping=true;done?.();};
   if(reducedMotion||duration===0){
     flight=null;camera.position.copy(position);controls.target.copy(lookAt);Object.assign(controls,limits);controls.update();finish();
@@ -198,7 +201,7 @@ function moveTo(position,lookAt,{duration=1.65,min=13,done=null}={}){
     // Quintic easing has a maximum slope of 1.875. Bound visual travel per
     // rendered frame so a slow GPU cannot turn a smooth return into a jump.
     const travel=Math.max(camera.position.distanceTo(position),controls.target.distanceTo(lookAt));
-    flight={from:camera.position.clone(),to:position.clone(),fromTarget:controls.target.clone(),toTarget:lookAt.clone(),time:0,maxStep:travel>0?.5*duration/(1.875*travel):duration,duration,done:finish};
+    flight={from:camera.position.clone(),to:position.clone(),fromTarget:controls.target.clone(),toTarget:lookAt.clone(),cosine,start:performance.now(),time:0,maxStep:travel>0?.5*duration/(1.875*travel):duration,duration,done:finish};
   }
 }
 function frame(which='hero',smooth=false){
@@ -267,6 +270,7 @@ function discover(kind){
     $('#return-view').hidden=false;frame('sky',true);announce('抬头看太阳和云，点回到初见可返回。');return;
   }
   if(kind==='sound'){closeHelp();hideHint();setTour(false);gardenAudio.open();return;}
+  if(kind==='anniversary'){milestone.open();return;}
   if(kind==='archive'||kind==='create-surprise'||kind.startsWith('surprise:')){
     closeHelp();hideHint();setTour(false);
     surprises.open(kind==='archive'?'archive':kind==='create-surprise'?'create':'surprise',kind.startsWith('surprise:')?kind.slice(9):undefined);
@@ -299,6 +303,8 @@ prepareContentEditor({
   onOpen:()=>openPanel('content'),onClose:()=>closePanel('content')
 });
 const gardenAudio=prepareGardenAudio({onOpen:()=>openPanel('sound'),onClose:()=>closePanel('sound')});
+const chimes=makeCreekChimes(scene,gardenAudio),gazing=makeStargazing(scene,presets.bench,moveTo,frame);
+const milestone=makeMilestone(island,{moveTo,frame,onOpen:()=>openPanel('anniversary'),onClose:()=>closePanel('anniversary'),stargaze:gazing.enter,currentView:()=>currentView});
 const surprises=prepareSurprises({
   onOpen:()=>openPanel('surprises'),onClose:()=>closePanel('surprises'),requestPlacement,
   onWorldChange:(records,event)=>{
@@ -371,6 +377,7 @@ window.addEventListener('keydown',event=>{
   if(contentEditorOpen)return;
   if(event.target instanceof HTMLElement&&(/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)||event.target.isContentEditable))return;
   if(event.key==='Escape'){
+    if(gazing.active){gazing.leave();return;}
     if(activeDialog)return;
     if(phase==='intro')finishIntro(true);else if(activePlace)returnToGarden();else closeHelp();
   }
@@ -387,7 +394,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestSce
 // Direct picking uses the real meshes. A small screen-space tolerance makes
 // the delicate ribbon reachable without introducing permanent floating labels.
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
-const interactive=[ribbon,props.mailbox,props.bench,...props.balloons].filter(Boolean);
+const interactive=[ribbon,props.mailbox,props.bench,milestone.plaque,...props.balloons].filter(Boolean);
 const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),...treeAsset.trunkMeshes].filter(Boolean);
 function pick(clientX,clientY){
   if(phase!=='exploring'||activeDialog||flight||intro||contentEditorOpen||pendingPlacement)return null;
@@ -417,7 +424,7 @@ function pick(clientX,clientY){
 }
 let ripplePointerTime=0;
 function disturbCreek(event,strength){
-  if(reducedMotion||phase!=='exploring'||activeDialog||contentEditorOpen||flight||intro||pendingPlacement)return;
+  if((reducedMotion&&event.type!=='pointerdown')||phase!=='exploring'||activeDialog||contentEditorOpen||flight||intro||pendingPlacement)return;
   if(strength>-.5&&performance.now()-ripplePointerTime<45)return;
   mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);
   raycaster.setFromCamera(mouse,camera);
@@ -425,6 +432,8 @@ function disturbCreek(event,strength){
   if(!hit)return;
   const block=raycaster.intersectObjects([...occluders,...interactive],true)[0];
   if(block&&block.distance<hit.distance-.02)return;
+  if(event.type==='pointerdown')chimes.strike(hit.point,!reducedMotion);
+  if(reducedMotion)return;
   creekRipples.addImpulseWorld(hit.point.x,hit.point.z,.20,strength);
   creekEcology.disturb(hit.point.x,hit.point.z,Math.abs(strength));
   ripplePointerTime=performance.now();
@@ -434,6 +443,12 @@ canvas.addEventListener('pointerdown',event=>{if(event.button===0)disturbCreek(e
 canvas.addEventListener('pointermove',event=>{
   if(!event.buttons)disturbCreek(event,-.16);
   if(pressed&&Math.hypot(event.clientX-pressed.x,event.clientY-pressed.y)>6)pressed.moved=true;
+  if(gazing.active){
+    hideHint();
+    mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
+    if(gazing.hover(!event.buttons&&!flight&&!activeDialog&&!contentEditorOpen?raycaster:null))canvas.dataset.hover='star';
+    return;
+  }
   if(event.buttons){hideHint();return;}
   if(phase==='exploring'&&!activeDialog&&!contentEditorOpen&&!flight&&!intro){
     mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
@@ -441,7 +456,7 @@ canvas.addEventListener('pointermove',event=>{
     if(meadowHit)butterflies.disturb(meadowHit.point);
   }
   const kind=pick(event.clientX,event.clientY);if(!kind){hideHint();return;}
-  const hint=$('#object-hint');hint.textContent=kind.startsWith('surprise:')?'风里藏着一点惊喜':{ribbon:'轻轻展开白丝带',mailbox:'这里，有一只信箱',bench:'坐一会儿',archive:archiveBook?.userData.hasNewArchives?'册子里，多了一页收藏':'翻翻长椅上的册子',sound:'听听风和溪水','create-surprise':'留一点小惊喜'}[kind];
+  const hint=$('#object-hint');hint.textContent=kind.startsWith('surprise:')?'风里藏着一点惊喜':{anniversary:'翻看我们的时光',ribbon:'轻轻展开白丝带',mailbox:'这里，有一只信箱',bench:'坐一会儿',archive:archiveBook?.userData.hasNewArchives?'册子里，多了一页收藏':'翻翻长椅上的册子',sound:'听听风和溪水','create-surprise':'留一点小惊喜'}[kind];
   hint.style.left=`${Math.min(event.clientX+18,innerWidth-170)}px`;hint.style.top=`${Math.max(12,event.clientY-37)}px`;hint.hidden=false;canvas.dataset.hover=kind;
 });
 canvas.addEventListener('pointerup',event=>{
@@ -454,11 +469,15 @@ canvas.addEventListener('pointerup',event=>{
       if(hit)finishPlacement({x:hit.point.x,z:hit.point.z});else announce('这里没有可放置的草地，请轻点主岛的上表面。');
       return;
     }
+    if(gazing.active){
+      mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
+      if(!flight)gazing.pick(raycaster);return;
+    }
     const kind=pick(event.clientX,event.clientY);if(kind)discover(kind);
   }
 });
 canvas.addEventListener('pointercancel',()=>{pressed=null;hideHint();});
-canvas.addEventListener('pointerleave',hideHint);
+canvas.addEventListener('pointerleave',()=>{hideHint();gazing.hover(null);});
 
 const queryView=new URLSearchParams(location.search).get('view');
 frame(queryView||'hero');
@@ -477,6 +496,8 @@ function animate(now){
   if(!reducedMotion)creekRipples.update(delta);
   rippleUniforms.uRippleSimTex.value=creekRipples.getTexture();
   benchTime.update(now,delta,reducedMotion);
+  gazing.update(currentView,phase==='exploring'&&!covered&&!pendingPlacement,elapsed,renderer,reducedMotion);
+  chimes.update(delta);listeningPlayer.userData.update(delta,gardenAudio.musicPlaying&&!reducedMotion);
   elapsed+=delta;time.value=reducedMotion?0:elapsed;
   props.update(reducedMotion?0:elapsed);atmosphere.update?.(reducedMotion?0:elapsed);
   surpriseWorld.update(elapsed);
@@ -491,8 +512,8 @@ function animate(now){
   }
   if(petalGuide&&!petalGuide.update(elapsed-petalStart))petalGuide=null;
   if(flight){
-    flight.time+=Math.min(delta,flight.maxStep);
-    const t=Math.min(1,flight.time/flight.duration),s=ease(t);
+    flight.time=flight.cosine?(now-flight.start)/1000:flight.time+Math.min(delta,flight.maxStep);
+    const t=Math.min(1,flight.time/flight.duration),s=flight.cosine?(1-Math.cos(Math.PI*t))/2:ease(t);
     camera.position.lerpVectors(flight.from,flight.to,s);controls.target.lerpVectors(flight.fromTarget,flight.toTarget,s);
     if(t===1){const done=flight.done;flight=null;controls.enableDamping=true;done?.();}
   }

@@ -65,3 +65,12 @@ h1{font:400 clamp(42px,5vw,76px)/1.12 var(--serif);letter-spacing:-.055em;margin
 #atmosphere-switcher button{border:0;background:transparent;border-radius:20px;padding:10px 12px;font:13px var(--chinese);color:#4c463f}
 #atmosphere-switcher button[aria-pressed="true"]{background:#403c46;color:#fff5df}
 #garden-ui[data-atmosphere="night"] .top-actions .icon-button{background:#efe9dedf;color:#343c41;border-radius:50%}
+
+#stargaze{position:absolute;right:var(--edge);bottom:max(86px,12vh);padding:10px 16px;border:1px solid #ffedce66;border-radius:24px;background:#262936e8;color:#ffe7c2}
+#anniversary-card{max-width:min(26rem,88vw);padding:2rem;border:1px solid #bfa478;border-radius:.6rem;background:#f4e6ca;color:#543f31;box-shadow:0 14px 60px #32251e45;font-family:var(--chinese)}
+#anniversary-card::backdrop{background:#24202b55}
+#anniversary-card h2{font-size:1.45rem}
+#anniversary-card .card-close{float:right;background:transparent;border:0;font-size:1.5rem}
+#anniversary-card .card-stars{background:#54434c;color:#fff1ce;padding:.6rem 1rem;border:0;border-radius:1.5rem}
+@media(max-width:650px){#stargaze{bottom:calc(max(84px,11vh) + 54px)}}
+#galaxy-return{position:absolute;right:var(--edge);top:calc(var(--edge) + 52px);padding:10px 16px;border-radius:24px;background:#262936ed;color:#ffe7c2;border:1px solid #ffedce66}

@@ -118,3 +118,4 @@ export const providedPhotoImport = {
 
 export const memories = [];
 export const letters = [];
+export const relationshipStartDate = '2025-09-23';

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npm run check:content && node scripts/review-overall-design.mjs && node scripts/review-stories.mjs && node scripts/review-love-tree.mjs && node scripts/review-ribbon-transition.mjs && node scripts/review-content-editor.mjs && node scripts/review-original-photos.mjs && node scripts/review-photo-paging.mjs && node scripts/review-drafts.mjs && node scripts/review-garden-audio.mjs && node scripts/review-surprises.mjs && node scripts/review-ceremony.mjs && node scripts/review-falling-foliage.mjs && node scripts/review-meadow-enrichment.mjs && node scripts/review-creek-fluidity.mjs && node scripts/review-waterfall-liveliness.mjs",
+    "test": "npm run check:content && node scripts/review-overall-design.mjs && node scripts/review-stories.mjs && node scripts/review-love-tree.mjs && node scripts/review-ribbon-transition.mjs && node scripts/review-content-editor.mjs && node scripts/review-original-photos.mjs && node scripts/review-photo-paging.mjs && node scripts/review-drafts.mjs && node scripts/review-garden-audio.mjs && node scripts/review-surprises.mjs && node scripts/review-ceremony.mjs && node scripts/review-falling-foliage.mjs && node scripts/review-meadow-enrichment.mjs && node scripts/review-creek-fluidity.mjs && node scripts/review-waterfall-liveliness.mjs && node scripts/review-musical-ripples.mjs && node scripts/review-stargazing-anniversary.mjs && node scripts/review-galaxy-warp.mjs",
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
@@ -22,7 +22,8 @@
     "test:foliage": "node scripts/review-falling-foliage.mjs",
     "test:meadow": "node scripts/review-meadow-enrichment.mjs",
     "test:water": "node scripts/review-creek-fluidity.mjs",
-    "test:waterfall": "node scripts/review-waterfall-liveliness.mjs"
+    "test:waterfall": "node scripts/review-waterfall-liveliness.mjs",
+    "test:galaxy": "node scripts/review-galaxy-warp.mjs"
   },
   "keywords": [],
   "author": "",

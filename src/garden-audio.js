@@ -258,5 +258,14 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   const ready=storedMusic('read').then(record=>{
     if(disposed)return;if(record?.blob instanceof Blob&&record.blob.size)setTrack(record);update();
   }).catch(error=>{if(!disposed)tell(error.message||'暂时未能读取本机音乐。',true);});
-  update();return {open,close,stop,startCeremony,getState,ready,dispose};
+  async function chimeOutput(){
+    if(disposed||preferences.muted||!preferences.natureVolume||document.hidden)return null;
+    const generation=audioGeneration;
+    await unlock();
+    if(disposed||generation!==audioGeneration||preferences.muted||document.hidden)return null;
+    clearTimeout(idleTimer);
+    idleTimer=setTimeout(idleSoon,900);
+    return {context,bus:master,volume:preferences.natureVolume};
+  }
+  update();return {open,close,stop,startCeremony,getState,ready,dispose,chimeOutput,get musicPlaying(){return !player.paused;}};
 }
