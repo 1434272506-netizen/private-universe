@@ -19,7 +19,15 @@ try{
     assert.equal(await page.locator('#enter').isEnabled(),true);
     assert.equal(await page.evaluate(()=>typeof window.__PU),'undefined');
   });
-  await page.locator('#enter-direct').click();await page.waitForTimeout(1500);
+  await check('Production wax seal unlocks the full ceremony and hands over to exploration',async()=>{
+    await page.locator('#wax-seal').click();await page.locator('#passphrase-input').waitFor({state:'visible'});
+    await page.locator('#enter').click();
+    await page.waitForFunction(()=>document.querySelector('#app').dataset.phase==='exploring',null,{timeout:60000});
+    assert.equal(await page.locator('#garden-ui').evaluate(el=>el.inert),false);
+    assert.equal(await page.locator('#skip-intro').isHidden(),true);
+    assert.equal(await page.locator('#view-title').textContent(),'记忆，系在枝头。');
+    await page.locator('#reset').click();await page.waitForTimeout(1800);
+  });
   await page.screenshot({path:'screenshots/design-production.png'});
   await check('Ribbon opens and closes through the accessible controls',async()=>{
     await page.locator('#help-toggle').click();await page.locator('[data-place="ribbon"]').click();

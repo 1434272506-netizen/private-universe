@@ -19,7 +19,7 @@ export function makeCloudVolumes(scene,time,sunDirection){
       vRay=position-vOrigin;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`;
   const fragmentShader=`precision highp sampler3D;
     uniform sampler3D uNoise;uniform float uTime,uSeed;
-    uniform vec3 uSun;varying vec3 vOrigin,vRay;
+    uniform float dusk,night; uniform vec3 uSun;varying vec3 vOrigin,vRay;
     float density(vec3 p){
       float shape=max(1.0-length((p-vec3(-.40,-.14,.02))/vec3(.61,.46,.67)),
         1.0-length((p-vec3(.25,-.18,-.10))/vec3(.65,.40,.70)));
@@ -46,7 +46,10 @@ export function makeCloudVolumes(scene,time,sunDirection){
           float optical=0.0;
           for(int j=1;j<=4;j++)optical+=density(p+uSun*float(j)*.14)*.14;
           float sunlight=exp(-optical*5.4);
-          vec3 light=vec3(.24,.32,.43)+vec3(1.0,.88,.69)*sunlight*(.92+forward*.32);
+          // 将原有的扁平 vec3(1., .45, .25) 升级为带向阳金辉与背阳暮紫的层次光
+          vec3 duskSunlight = mix(vec3(0.38, 0.22, 0.30), vec3(1.15, 0.72, 0.30), clamp(sunlight * 1.5 + forward * 0.5, 0.0, 1.0));
+          vec3 light = mix(mix(vec3(.24,.32,.43), vec3(.20,.12,.16), dusk), vec3(.008,.014,.028), night) + 
+                       mix(mix(vec3(1.0,.88,.69), duskSunlight, dusk), vec3(.18,.25,.38), night) * sunlight * (.92 + forward * .32);
           float alpha=1.0-exp(-d*stepSize*5.2);
           sum+=transmit*alpha*light;transmit*=1.0-alpha;
           if(transmit<.025)break;

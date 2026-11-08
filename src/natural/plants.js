@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {rng,fbm} from './shared.js';
-import {ground,inside,creekX,creekWidth,RX,RZ} from './land.js';
+import {ground,inside,creekX,creekWidth,waterY,RX,RZ} from './land.js';
 import {makeBanyan} from './banyan.js';
+import {guidingWindGust} from './falling-foliage.js';
 
 // A little less lawn, a little more meadow: plants share patches of habitat,
 // while the places people would sit, cross and walk remain softly open.
@@ -164,4 +165,140 @@ function addWind(shader,time,strength,height=.24){
   shader.uniforms.uTime=time;
   shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nuniform float uTime;')
     .replace('#include <begin_vertex>',`#include <begin_vertex>\n#ifdef USE_INSTANCING\nvec3 origin=instanceMatrix[3].xyz;float windHeight=clamp(position.y/${height},0.,1.);windHeight*=windHeight;transformed.x+=sin(uTime*1.05+origin.x*.8+origin.z*.6)*${strength}*windHeight;transformed.z+=sin(uTime*.77+origin.z*.83)*${strength*.4}*windHeight;\n#endif`);
+}
+
+/** Small living habitats, batched independently of the existing grass canopy. */
+export function makeMeadowEcology(parent){
+  const random=rng(6207),group=new THREE.Group();group.name='meadow-ecology';parent.add(group);
+  const dummy=new THREE.Object3D(),batches=[],plants=[],perches=[];
+  let clock=0,disposed=false;
+  // Tiny colored surfaces keep flower centers and stems in the blossom draw.
+  function surface(){
+    const positions=[],colors=[],alphas=[];
+    return {
+      triangle(a,b,c,hex,alpha=[1,1,1]){const color=new THREE.Color(hex);for(const v of [a,b,c]){positions.push(...v);colors.push(color.r,color.g,color.b);}alphas.push(...alpha);},
+      finish(){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));g.setAttribute('tuftAlpha',new THREE.Float32BufferAttribute(alphas,1));g.computeVertexNormals();return g;}
+    };
+  }
+  function stem(s,height=.2){
+    for(let j=0;j<2;j++){
+      const y=j*height/2,ny=(j+1)*height/2,x=.018*(y/height)**2,nx=.018*(ny/height)**2;
+      for(const axis of [0,2]){
+        const a=[x,y,0],b=[x,y,0],c=[nx,ny,0],d=[nx,ny,0];
+        a[axis]-=.0025;b[axis]+=.0025;c[axis]-=.002;d[axis]+=.002;
+        s.triangle(a,b,c,'#568144');s.triangle(b,d,c,'#568144');
+      }
+    }
+  }
+  function blossom(s,n,r,y,hex){
+    for(let j=0;j<n;j++){
+      const a=j/n*Math.PI*2,point=(radius,angle,h)=>[.018+Math.cos(angle)*radius,h,Math.sin(angle)*radius];
+      const root=point(.007,a,y),left=point(r*.75,a-.24,y+.008),tip=point(r,a,y+.004),right=point(r*.75,a+.24,y+.008);
+      if(n===5){
+        const l=point(r*.94,a-.16,y+.006),rgt=point(r*.94,a+.16,y+.006);
+        s.triangle(root,left,l,hex);s.triangle(root,l,rgt,hex);s.triangle(root,rgt,right,hex);
+      }else{s.triangle(root,left,tip,hex);s.triangle(root,tip,right,hex);}
+    }
+    for(let j=0;j<4;j++){
+      const a=j*Math.PI/2,b=a+Math.PI/2;
+      s.triangle([.018,y+.014,0],[.018+Math.cos(a)*.011,y+.008,Math.sin(a)*.011],[.018+Math.cos(b)*.011,y+.008,Math.sin(b)*.011],'#ffe066');
+    }
+  }
+  function batch(name,g,mat,count){
+    const mesh=new THREE.InstancedMesh(g,mat,count);mesh.name=name;mesh.receiveShadow=true;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);group.add(mesh);batches.push(mesh);return mesh;
+  }
+  const plantMat=()=>new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8,side:THREE.DoubleSide});
+  const blueSurface=surface();stem(blueSurface);blossom(blueSurface,5,.05,.2,'#48cae4');
+  const blue=batch('creek-forget-me-nots',blueSurface.finish(),plantMat(),150);
+  const stemsSurface=surface();stem(stemsSurface,.3);
+  const stems=batch('dandelion-stems',stemsSurface.finish(),plantMat(),35);
+  const goldSurface=surface();blossom(goldSurface,12,.07,.3,'#ffb703');
+  const gold=batch('golden-dandelions',goldSurface.finish(),plantMat(),14);
+  const fluffSurface=surface();
+  // Three-dimensional soft tufts around a seedhead, rather than a solid ball.
+  for(let i=0;i<22;i++){
+    const v=1-2*(i+.5)/22,a=i*2.39996,n=new THREE.Vector3(Math.sqrt(1-v*v)*Math.cos(a),v,Math.sqrt(1-v*v)*Math.sin(a));
+    const tangent=new THREE.Vector3().crossVectors(n,new THREE.Vector3(0,1,.1)).normalize();
+    const bitangent=new THREE.Vector3().crossVectors(n,tangent).normalize(),center=n.clone().multiplyScalar(.073).add(new THREE.Vector3(.018,.3,0));
+    const points=[tangent.clone().multiplyScalar(.052),bitangent.clone().multiplyScalar(.052),tangent.clone().multiplyScalar(-.052),bitangent.clone().multiplyScalar(-.052)].map(p=>p.add(center).toArray());
+    for(let j=0;j<4;j++)fluffSurface.triangle(center.toArray(),points[j],points[(j+1)%4],'#ffffff',[1,0,0]);
+  }
+  const fluff=batch('white-dandelion-seedheads',fluffSurface.finish(),new THREE.MeshStandardMaterial({color:'#ffffff',emissive:'#ffffff',emissiveIntensity:.22,transparent:true,opacity:.88,roughness:.8,side:THREE.DoubleSide,depthWrite:false,forceSinglePass:true}),21);
+  fluff.material.onBeforeCompile=shader=>{
+    shader.vertexShader='attribute float tuftAlpha;\nvarying float vTuftAlpha;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvTuftAlpha=tuftAlpha;');
+    shader.fragmentShader='varying float vTuftAlpha;\n'+shader.fragmentShader;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>','diffuseColor.a*=smoothstep(0.0,0.8,vTuftAlpha);\n#include <alphatest_fragment>');
+  };
+  fluff.material.customProgramCacheKey=()=> 'soft-spatial-seedhead';
+  function record(mesh,index,x,z,scale,head,links=[]){
+    const p={mesh,index,x,z,y:ground(x,z),scale,angle:random()*Math.PI*2,phase:random()*Math.PI*2,head,links,matrix:new THREE.Matrix4()};
+    plants.push(p);return p;
+  }
+  // The ground/water intersection is the visible shoreline, not the centerline width.
+  function shore(z,side){
+    let distance=creekWidth(z);
+    while(distance<1.6&&ground(creekX(z)+side*distance,z)<waterY(z)+.025)distance+=.025;
+    return creekX(z)+side*distance;
+  }
+  for(let i=0;i<150;i++){
+    const side=i%2?1:-1,z=-3.5+(i/150)*7.2+(random()-.5)*.12,x=shore(z,side)+side*(.25+random()*.35);
+    const p=record(blue,i,x,z,.85+random()*.25,.214);
+    // Several real blossom tips in each habitat allow a different landing flower.
+    if([38,42,46,104,108,112].includes(i))perches.push({plant:p,getPoint(out){return out.set(.018,p.head,0).applyMatrix4(p.matrix);}});
+  }
+  const patches=[[-4.5,1.8],[1.2,-1.8],[5,1.2],[4.8,.25]];
+  for(let i=0;i<35;i++){
+    const patch=patches[i%4],a=random()*Math.PI*2,r=.2+random()*.55;
+    let x=patch[0]+Math.cos(a)*r,z=patch[1]+Math.sin(a)*r*.65;
+    if(Math.abs(x-creekX(z))<.95)x=shore(z,x<creekX(z)?-1:1)+(x<creekX(z)?-.4:.4);
+    const isFluff=i<21,mesh=isFluff?fluff:gold,index=isFluff?i:i-21;
+    record(stems,i,x,z,.85+random()*.25,.3,[{mesh,index}]);
+  }
+  const pebbleGeometry=new THREE.SphereGeometry(1,8,5);
+  const pebbles=batch('wet-creek-pebbles',pebbleGeometry,new THREE.MeshStandardMaterial({color:'#8b9588',roughness:.16}),12);
+  const mossGeometry=new THREE.SphereGeometry(1,8,2,0,Math.PI*2,0,Math.PI*.38);
+  const mossPositions=mossGeometry.attributes.position,mossColors=[];
+  for(let i=0;i<mossPositions.count;i++){
+    const x=mossPositions.getX(i),y=mossPositions.getY(i),z=mossPositions.getZ(i),a=Math.atan2(z,x);
+    const ripple=1+.045*Math.sin(a*3+.7)+.025*Math.cos(a*5);
+    mossPositions.setXYZ(i,x*ripple,y+(1-y)*.06*Math.sin(a*5),z*ripple);
+    const c=new THREE.Color('#ffffff').multiplyScalar(.72+.28*(.5+.5*Math.sin(x*13+z*9)));mossColors.push(c.r,c.g,c.b);
+  }
+  mossGeometry.setAttribute('color',new THREE.Float32BufferAttribute(mossColors,3));mossGeometry.computeVertexNormals();
+  const moss=batch('pebble-moss-caps',mossGeometry,new THREE.MeshStandardMaterial({color:'#2d6a4f',vertexColors:true,roughness:.95}),12);
+  for(let i=0;i<12;i++){
+    const z=-3.2+i*.6,side=i%2?1:-1,x=shore(z,side)+side*(.02+random()*.10),r=.085+random()*.07;
+    dummy.position.set(x,ground(x,z)+r*.22,z);dummy.rotation.set(.12,random()*Math.PI*2,.1);
+    dummy.scale.set(r,r*.65,r*.8);dummy.updateMatrix();pebbles.setMatrixAt(i,dummy.matrix);
+    dummy.scale.multiplyScalar(1.025);dummy.updateMatrix();moss.setMatrixAt(i,dummy.matrix);
+  }
+  const cloverSurface=surface();
+  for(let i=0;i<3;i++){const a=i*Math.PI*2/3,root=[0,.055,0],left=[Math.cos(a-.55)*.04,.065,Math.sin(a-.55)*.04],tip=[Math.cos(a)*.065,.06,Math.sin(a)*.065],right=[Math.cos(a+.55)*.04,.065,Math.sin(a+.55)*.04];cloverSurface.triangle(root,left,tip,'#4c8652');cloverSurface.triangle(root,tip,right,'#68a45a');}
+  const clover=batch('low-clover-mats',cloverSurface.finish(),plantMat(),48);
+  for(let i=0;i<48;i++){
+    const center=i<24?[-4.4,1]:[4.6,2.1],a=random()*Math.PI*2,r=.15+random()*.75,x=center[0]+Math.cos(a)*r,z=center[1]+Math.sin(a)*r;
+    dummy.position.set(x,ground(x,z)+.003,z);dummy.rotation.set(0,a,0);dummy.scale.setScalar(.8+random()*.4);dummy.updateMatrix();clover.setMatrixAt(i,dummy.matrix);
+  }
+  function writePlants(){
+    const gust=guidingWindGust(clock);
+    for(const p of plants){
+      dummy.position.set(p.x,p.y,p.z);dummy.scale.setScalar(p.scale);
+      dummy.rotation.set(Math.sin(clock*.85+p.phase)*(.025+.07*gust),p.angle,Math.sin(clock*1.2+p.phase)*(.035+.10*gust));
+      dummy.updateMatrix();p.matrix.copy(dummy.matrix);p.mesh.setMatrixAt(p.index,dummy.matrix);
+      for(const link of p.links)link.mesh.setMatrixAt(link.index,dummy.matrix);
+    }
+    for(const mesh of [blue,stems,gold,fluff])mesh.instanceMatrix.needsUpdate=true;
+    group.userData.clock=clock;
+  }
+  writePlants();for(const mesh of batches){mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();}
+  const statistics={dandelions:35,forgetMeNots:150,pebbles:12,clover:48,triangles:batches.reduce((n,m)=>n+(m.geometry.index?m.geometry.index.count:m.geometry.attributes.position.count)/3*m.count,0)};
+  group.userData.statistics=statistics;
+  function update(delta,{covered=false,reducedMotion=false}={}){
+    if(disposed||covered||reducedMotion)return false;
+    clock+=Math.max(0,Math.min(.06,delta));writePlants();return true;
+  }
+  function dispose(){if(disposed)return;disposed=true;group.removeFromParent();for(const m of batches){m.dispose();m.geometry.dispose();m.material.dispose();}}
+  return {group,perches,statistics,update,dispose,get clock(){return clock;}};
 }

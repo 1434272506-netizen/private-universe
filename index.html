@@ -9,21 +9,38 @@
 </head>
 <body>
   <main id="app" data-phase="invitation">
-    <section id="invitation" aria-labelledby="invitation-title">
-      <span class="invitation-overline">A LITTLE PLACE IN THE SKY</span>
-      <div class="invitation-body">
+    <section id="invitation" class="ceremony-gate" aria-labelledby="invitation-title">
+      <span class="invitation-overline">A SPRING OF OUR OWN</span>
+      <div class="invitation-body wax-envelope-card">
         <div class="two-dots" aria-hidden="true"><i></i><i></i></div>
         <h1 id="invitation-title">Private Universe</h1>
+        <p class="invitation-subtitle">一隅春天</p>
         <p class="invitation-line">有个地方，想带你去看看。</p>
+        <div class="wax-seal-container">
+          <button id="wax-seal" class="wax-seal-button" type="button" aria-label="轻触火漆印章开启" aria-expanded="false" aria-controls="passphrase-form" disabled>
+            <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 21C3 22 7 6 15 9Q20 10 20 18Q20 5 28 9C39 15 28 23 21 21Q35 23 28 32C21 38 18 28 20 22Q17 35 9 29C2 21 15 18 20 21ZM20 21Q18 32 23 35"/></svg>
+          </button>
+          <span class="seal-hint">轻触火漆印章开启</span>
+        </div>
         <div class="invitation-action">
           <p id="loading" role="status" aria-live="polite">有一个小世界，正在为你醒来。</p>
-          <button id="enter" class="enter-button" type="button" disabled>进入这座花园 <span aria-hidden="true">↗</span></button>
+          <form id="passphrase-form" class="passphrase-strip" hidden>
+            <label class="sr-only" for="passphrase-input">属于我们的专属暗号</label>
+            <input id="passphrase-input" type="password" maxlength="64" placeholder="输入属于我们的专属暗号（如纪念日）" autocomplete="off" aria-describedby="passphrase-error">
+            <button id="enter" type="submit" aria-label="确认启封" disabled>启封 ↗</button>
+          </form>
+          <p id="passphrase-error" class="passphrase-feedback" aria-live="polite" hidden></p>
           <button id="enter-direct" class="quiet-button" type="button" hidden>直接看花园</button>
         </div>
       </div>
       <span class="invitation-footnote">MADE FOR TWO <span aria-hidden="true">—</span> A SPRING OF OUR OWN</span>
     </section>
     <div id="garden-ui" inert>
+      <nav id="atmosphere-switcher" aria-label="浮岛时光氛围切换" hidden>
+        <button type="button" data-atmo="day" aria-pressed="true">☀ 春日暖阳</button>
+        <button type="button" data-atmo="sunset" aria-pressed="false">☼ 蜜桃晚霞</button>
+        <button type="button" data-atmo="night" aria-pressed="false">☾ 银河萤火</button>
+      </nav>
       <header class="masthead"><span>Private Universe<span class="brand-dot">.</span></span><span class="brand-note">一隅春天</span></header>
       <div class="top-actions" aria-label="花园选项">
         <button class="add-content-button" id="add-content" type="button" aria-haspopup="dialog" aria-controls="content-dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>收藏一段</button>
@@ -42,7 +59,7 @@
       </div>
       <p id="explore-hint" class="explore-hint">听说，这里的东西不全是摆设。</p>
     </div>
-    <button id="skip-intro" class="quiet-button" type="button" hidden>跳过开场 <span aria-hidden="true">↗</span></button>
+    <button id="skip-intro" class="quiet-button" type="button" hidden>跳过入场 <span aria-hidden="true">↗</span></button>
     <div id="object-hint" role="presentation" hidden></div>
     <button id="return-view" class="return-view" type="button" hidden><span aria-hidden="true">←</span> 回到花园</button>
     <p id="scene-error" class="scene-error" role="alert" hidden></p>
@@ -104,7 +121,9 @@
   <script type="module">
     import('/src/natural/engine.js').catch(error => {
       document.querySelector('#loading').textContent='花园暂时没有打开，请重试。';
-      const button=document.querySelector('#enter');button.disabled=false;button.textContent='重新打开';button.onclick=()=>location.reload();console.error(error);
+      document.querySelector('#loading').classList.remove('is-ready');
+      document.querySelector('#passphrase-form').hidden=false;document.querySelector('#passphrase-input').hidden=true;
+      const button=document.querySelector('#enter');button.type='button';button.disabled=false;button.textContent='重新打开';button.setAttribute('aria-label','重新打开');button.onclick=()=>location.reload();console.error(error);
     });
   </script>
 </body>

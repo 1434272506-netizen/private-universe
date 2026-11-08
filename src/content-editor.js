@@ -245,6 +245,12 @@ export function prepareContentEditor({onChange,onOpen=()=>{},onClose=()=>{}}){
   }
   $('#add-content').addEventListener('click',()=>open());
   document.addEventListener('content-add',event=>open(event.detail?.kind));
+  document.addEventListener('content-edit',async event=>{
+    if(event.detail?.kind!=='memory'||busy)return;
+    if(!loaded)await initialize();
+    const record=content.memories.find(item=>item.id===event.detail.id);if(!record)return;
+    open('memory');chooseTab('memory');await editMemory(record);
+  });
   $('#close-editor').addEventListener('click',close);
   // Keep drafts when the panel closes; an accidental click outside never drops them.
   dialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();close();});

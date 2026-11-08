@@ -77,6 +77,9 @@ try{
   });
   await check('Photo edit preserves image without reselecting a file',async()=>{
     await openEditor();await page.locator('#saved-memories .saved-actions button').first().click();
+    // Editing first clears the persisted draft in IndexedDB. Wait for that
+    // transaction before inspecting the resulting form state.
+    await page.waitForFunction(()=>!document.querySelector('#memory-file').required&&document.querySelector('#content-dialog').getAttribute('aria-busy')!=='true');
     assert.equal(await page.locator('#memory-file').evaluate(el=>el.required),false);
     await page.locator('#memory-caption').fill(caption+' 已修改');await submit(page,'memory');await saved(page,'memory','已放到白丝带上');
     assert.equal(await page.locator('#saved-memories .saved-item').count(),1);

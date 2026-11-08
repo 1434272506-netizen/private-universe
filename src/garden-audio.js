@@ -2,7 +2,7 @@ import './garden-audio.css';
 
 const DATABASE='private-universe-audio',PREFERENCES='private-universe-sound-preferences';
 const MUSIC_LIMIT=50*1024*1024;
-const defaults={natureVolume:.32,musicVolume:.38,muted:false};
+const defaults={natureVolume:.6,musicVolume:.38,muted:false};
 const clamp=value=>Math.max(0,Math.min(1,Number(value)||0));
 const make=(tag,className,text)=>{
   const element=document.createElement(tag);if(className)element.className=className;
@@ -67,7 +67,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     <header class="sound-heading"><span class="tiny-label">LISTEN TO THE AFTERNOON</span><h2 id="sound-title">听一会儿，春天。</h2><p>让风和溪水作伴，也可以放一首自己的歌。</p></header>
     <section class="sound-section" aria-labelledby="nature-title"><div class="sound-section-heading"><div><h3 id="nature-title">花园里的声音</h3><p>风、叶间细响和溪流，轻轻铺在身边。</p></div><button id="nature-play" class="sound-control" type="button" aria-pressed="false">听听自然声</button></div><label class="sound-volume"><span>自然声的音量</span><input id="nature-volume" type="range" min="0" max="100" step="1"><output id="nature-volume-label"></output></label></section>
     <section class="sound-section" aria-labelledby="music-title"><div class="sound-section-heading"><div><h3 id="music-title">自己的音乐</h3><p id="music-name">还没有放入音乐</p></div><button id="music-play" class="sound-control" type="button" disabled>播放音乐</button></div><label class="sound-file"><span>选一首本机音乐</span><input id="music-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"><small>MP3、WAV、OGG、M4A 等浏览器支持的音频，最多 50 MB。</small></label><label class="sound-volume"><span>音乐的音量</span><input id="music-volume" type="range" min="0" max="100" step="1"><output id="music-volume-label"></output></label><button id="music-remove" class="quiet-button sound-remove" type="button" hidden>移除这首音乐</button></section>
-    <footer class="sound-footer"><button id="sound-mute" class="sound-control sound-mute" type="button" aria-pressed="false">全部静音</button><p>音乐只保存在当前设备、浏览器和网址下。首次进入不会自动播放；离开页面会暂停，回来后可以再打开。</p></footer>
+    <footer class="sound-footer"><button id="sound-mute" class="sound-control sound-mute" type="button" aria-pressed="false">全部静音</button><p>音乐只保存在当前设备、浏览器和网址下。启封信笺时，风声与已收藏的音乐会轻轻响起；离开页面会暂停。</p></footer>
     <p id="sound-feedback" class="sound-feedback" role="status" aria-live="polite"></p>
   </section>`;
   document.querySelector('#app').append(dialog);
@@ -164,6 +164,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     try{
       await unlock();
       if(generation!==audioGeneration||request!==musicRequest||disposed||document.hidden){idleSoon();return;}
+      ramp(musicBus.gain,preferences.musicVolume);
       if(!musicNode){musicNode=context.createMediaElementSource(player);musicNode.connect(musicBus);}
       await player.play();
       if(disposed||document.hidden){player.pause();idleSoon();return;}
@@ -222,6 +223,32 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     if(wasPlaying)tell('离开页面时声音已暂停，想听时再打开。');update();
   },{signal});
   function stop(){pauseNature();pauseMusic();}
+  async function startCeremony(){
+    // Called directly in the unlocking gesture: create/resume and play before
+    // any asynchronous storage or decoding work can consume user activation.
+    if(disposed||document.hidden)return;
+    const nr=++natureRequest,mr=++musicRequest;
+    natureStarting=true;clearTimeout(fadeTimer);
+    try{
+      const unlocked=unlock();
+      let playing=null;
+      if(track&&!busy&&context){
+        if(!musicNode){musicNode=context.createMediaElementSource(player);musicNode.connect(musicBus);}
+        ramp(musicBus.gain,0,0);
+        playing=player.play().then(()=>true,()=>false);
+      }
+      await unlocked;
+      if(disposed||document.hidden||nr!==natureRequest){idleSoon();return;}
+      makeNature();naturePlaying=true;ramp(natureBus.gain,preferences.natureVolume,1);
+      if(playing&&await playing&&mr===musicRequest&&!document.hidden){
+        const now=context.currentTime;
+        musicBus.gain.cancelScheduledValues(now);musicBus.gain.setValueAtTime(0,now);
+        musicBus.gain.setValueAtTime(0,now+1);musicBus.gain.linearRampToValueAtTime(preferences.musicVolume,now+4);
+      }
+      tell('春风和溪水，轻轻醒来了。');
+    }catch{stop();tell('声音暂时未能开启，可以在「听听花园」里再试一次。',true);}
+    finally{if(nr===natureRequest)natureStarting=false;update();}
+  }
   function getState(){return {naturePlaying,musicPlaying:!player.paused,muted:preferences.muted,natureVolume:preferences.natureVolume,musicVolume:preferences.musicVolume,audioState:context?.state||'not-started',track:track?{name:track.name,bytes:track.blob.size,duration:track.duration}:null};}
   function dispose(){
     if(disposed)return;const wasOpen=dialog.open;if(wasOpen)dialog.close();disposed=true;natureRequest++;musicRequest++;clearTimeout(fadeTimer);clearTimeout(idleTimer);
@@ -231,5 +258,5 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   const ready=storedMusic('read').then(record=>{
     if(disposed)return;if(record?.blob instanceof Blob&&record.blob.size)setTrack(record);update();
   }).catch(error=>{if(!disposed)tell(error.message||'暂时未能读取本机音乐。',true);});
-  update();return {open,close,stop,getState,ready,dispose};
+  update();return {open,close,stop,startCeremony,getState,ready,dispose};
 }
