@@ -35,7 +35,7 @@ try{
     const canopy=[];
     for(let i=0;i<32;i++){
       mesh.getMatrixAt(i,mat);position.setFromMatrixPosition(mat);canopy.push(position.clone());
-      assert.ok(position.x>=-4.5&&position.x<=.5&&position.y>=3.8&&position.y<=7.8&&position.z>=-1.2&&position.z<=3.2);
+      assert.ok(position.x>=-13&&position.x<=-5&&position.y>=7&&position.y<=12&&position.z>=-5.4&&position.z<=.6);
     }
     for(const [axis,span] of [['x',4],['y',3.2],['z',3.5]])assert.ok(Math.max(...canopy.map(p=>p[axis]))-Math.min(...canopy.map(p=>p[axis]))>span,`${axis} fills the canopy`);
     const before=Array.from(matrix.array);camera.position.set(30,4,-10);system.update(0);

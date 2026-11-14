@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {chromium} from 'playwright-core';
-import {WATER_END} from '../src/natural/land.js';
+import {WATER_START,WATER_END} from '../src/natural/land.js';
 import {creekPitch} from '../src/natural/chimes-audio.js';
 const hz=[523.25,587.33,659.25,783.99,880,1046.5];
-hz.forEach((f,i)=>assert.equal(creekPitch(i===5?WATER_END:-4.8+(i+.1)*(WATER_END+4.8)/5),f));
+hz.forEach((f,i)=>assert.equal(creekPitch(i===5?WATER_END:WATER_START+(i+.1)*(WATER_END-WATER_START)/5),f));
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
 try{
   const page=await browser.newPage(),errors=[];

@@ -1,0 +1,23 @@
+{
+  "blender": "4.5.9 LTS",
+  "triangles": {
+    "door-hardware": 432,
+    "window-hardware": 2080,
+    "chimney-cap-detail": 1004,
+    "porch-hanging-lamp": 484,
+    "porch-hanging-lamp-glass": 48,
+    "porch-lamp-wick-mesh": 20
+  },
+  "totalTriangles": 4068,
+  "units": "metres, Three.js Y-up",
+  "bytes": 257948,
+  "groups": [
+    "door-hardware",
+    "window-hardware",
+    "chimney-cap-detail",
+    "porch-hanging-lamp"
+  ],
+  "windowSets": 4,
+  "wickMarker": "porch-lamp-wick",
+  "authoringScript": "scripts/authoring/create_cabin_parts.py"
+}

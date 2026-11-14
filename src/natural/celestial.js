@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {starTexture} from './star-texture.js';
 
 export function celestial(time){
   const positions=[],sizes=[],phases=[],speeds=[];
@@ -19,7 +20,7 @@ export function celestial(time){
   }
   const material=new THREE.ShaderMaterial({
     transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
-    uniforms:{uTime:time,opacity:{value:0}},
+    uniforms:{starMap:{value:starTexture},uTime:time,opacity:{value:0}},
     vertexShader:`attribute float size,aPhase,aTwinkleSpeed;
       uniform float uTime;
       varying float tier,twinkle;
@@ -29,10 +30,10 @@ export function celestial(time){
         gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);
         gl_PointSize=size;
       }`,
-    fragmentShader:`uniform float opacity; varying float tier,twinkle;
+    fragmentShader:`uniform sampler2D starMap;uniform float opacity; varying float tier,twinkle;
       void main(){
         vec2 p=abs(gl_PointCoord*2.-1.);
-        float core=exp(-3.5*dot(p,p));
+        float core=texture2D(starMap,gl_PointCoord).a;
         vec3 tint=tier>4.?vec3(1.6,1.8,2.2):tier>2.?vec3(1.2,1.4,1.8):vec3(.85,.95,1.2);
         float rays=step(4.,tier)*exp(-8.*min(p.x,p.y))*(1.-max(p.x,p.y));
         gl_FragColor=vec4(tint,opacity*twinkle*min(1.,core+rays));

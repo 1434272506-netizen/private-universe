@@ -1,53 +1,12 @@
 import {memories as suppliedMemories,letters as suppliedLetters} from './personal-content.js';
 import './stories.css';
+import {mergeDisplayMemories,photoInspirations} from './memory-display.js';
+import {publicAssetURL} from './public-assets.js';
 import {isLetterRead,markLetterRead,letterReadingKey} from './letter-reading.js';
 import './letter-reading.css';
 
 const records=value=>Array.isArray(value)?value.filter(item=>item&&typeof item==='object'&&!Array.isArray(item)):[];
 const contentText=value=>typeof value==='string'?value:typeof value==='number'?String(value):'';
-// Display-only suggestions keyed by immutable original IDs; never written to storage.
-const photoInspirations={
-  "original-20261029-photo-01": {
-    "title": "夜幕初见·心动回响",
-    "note": "那晚桥上的风很大，身后的霓虹很亮，但我的视线里只有你的眼睛。从那一刻起，我知道我的世界多了一束光。"
-  },
-  "original-20261029-photo-02": {
-    "title": "并肩同行·风里冒险",
-    "note": "戴上笨笨的安全头盔，在风里一起做鬼脸。只要和你在一起，连迷路都变成了一场最快乐的奇遇。"
-  },
-  "original-20261029-photo-03": {
-    "title": "午后微光·温柔同频",
-    "note": "车窗外飞驰而过的树影，车厢里轻柔的呼吸。闭上眼睛，听见两颗心跳在同一个节奏里。"
-  },
-  "original-20261029-photo-04": {
-    "title": "卸下防备·自在天真",
-    "note": "不用在乎表情管不管理，不用在乎镜头的角度。能毫无保留地在一个人面前做个傻瓜，是世界上最幸运的事。"
-  },
-  "original-20261029-photo-05": {
-    "title": "烛光心愿·年年有你",
-    "note": "小狗蛋糕上的蜡烛在轻轻跳动。你闭上眼睛许愿的时候，我在心底偷偷祈祷：每一个以后的生日，我都想陪你一起吹灭蜡烛。"
-  },
-  "original-20261029-photo-06": {
-    "title": "日落黄昏·笃定相依",
-    "note": "太阳落下去的时候，天空被染成了温柔的蜜桃金。你把头靠在我肩上，那一秒，我真希望时间就此静止。"
-  },
-  "original-20261029-photo-07": {
-    "title": "凛冬清晨·抵御严寒",
-    "note": "冬夜的空气很冷，但毛绒大衣里的心跳滚烫。脸颊上轻轻落下的一吻，足以抵挡世间所有的风霜。"
-  },
-  "original-20261029-photo-08": {
-    "title": "惊艳时光·为你着迷",
-    "note": "朱红色的回廊，雕梁画栋的古亭。世间风景万千，可你在我镜头里轻轻一侧身，就美成了我心底一辈子的惊艳。"
-  },
-  "original-20261029-photo-09": {
-    "title": "默契同频·身后有我",
-    "note": "你捧着脸对着镜头古灵精怪，我在你身后悄悄探出脑袋。别害怕前方的路，你一回头，我永远都在。"
-  },
-  "original-20261029-photo-10": {
-    "title": "浮岛永恒·私家宇宙",
-    "note": "揉乱你头发时的笑闹，车座上并肩的琐碎日常。我们的爱情不是轰轰烈烈的口号，而是把每一个平凡的日子，都过成闪闪发光的私家宇宙。"
-  }
-};
 let memories=[],letters=[],storyEvents;
 
 const element=(tag,className,text)=>{
@@ -78,7 +37,7 @@ function photograph(memory,eager=false){
   fallback.append(element('span',null,'照片暂时没有打开'),element('small',null,'这段回忆的文字仍在这里。'));
   const fail=()=>{image.hidden=true;fallback.hidden=false;frame.classList.add('is-unavailable');};
   image.addEventListener('error',fail,{once:true});
-  if(typeof memory.image==='string'&&memory.image.trim())image.src=memory.image;else fail();
+  if(typeof memory.image==='string'&&memory.image.trim())image.src=publicAssetURL(memory.image);else fail();
   frame.append(image,fallback);return frame;
 }
 function resetScroll(dialog){dialog.scrollTop=0;}
@@ -97,8 +56,17 @@ function addContentButton(kind){
 }
 export function prepareStories(local={memories:[],letters:[]}){
   storyEvents?.abort();storyEvents=new AbortController();
-  memories=[...records(suppliedMemories),...records(local.memories)];
-  letters=[...records(suppliedLetters),...records(local.letters)];
+  memories=mergeDisplayMemories(local.memories);
+
+  const seenLetterKeys = new Set();
+  const rawLetters = [...records(suppliedLetters), ...records(local.letters)];
+  letters = rawLetters.filter(l => {
+    const key = l.id || `${l.title}:${l.date}`;
+    if (!key) return true;
+    if (seenLetterKeys.has(key)) return false;
+    seenLetterKeys.add(key);
+    return true;
+  });
   const memoryContent=document.querySelector('#memory-content'),letterContent=document.querySelector('#letter-content');
   const rememberedPhoto={id:memoryContent.dataset.memoryId,index:Number(memoryContent.dataset.pageIndex)||0,flipped:!!memoryContent.querySelector('.photo-card-flipper.is-flipped')};
   memoryContent.replaceChildren();letterContent.replaceChildren();
@@ -151,7 +119,7 @@ function prepareMemories(root,remembered={}){
     root.dataset.pageIndex=String(shown);root.dataset.memoryId=photos[shown].id||'';
     original.hidden=true;original.removeAttribute('href');
     try{
-      const url=new URL(photos[shown].image,location.href);
+      const url=new URL(publicAssetURL(photos[shown].image),location.href);
       if(['http:','https:','blob:'].includes(url.protocol)){original.href=url.href;original.hidden=false;}
     }catch{/* A missing picture can still show its text and navigation. */}
   }
@@ -161,7 +129,7 @@ function prepareMemories(root,remembered={}){
     image.alt=contentText(photo.alt)||contentText(photo.caption)||`第 ${index+1} 张照片`;
     const ready=(async()=>{
       if(typeof photo.image!=='string'||!photo.image.trim())return {image:null};
-      image.src=photo.image;
+      image.src=publicAssetURL(photo.image);
       try{await image.decode();return image.naturalWidth?{image}:{image:null};}catch{return {image:null};}
     })();
     decoded.set(index,ready);return ready;
@@ -209,7 +177,7 @@ function prepareMemories(root,remembered={}){
     const edit=button('✎ 补写小注','photo-edit-note-trigger',()=>document.dispatchEvent(new CustomEvent('content-edit',{detail:{kind:'memory',id:photo.id}})));
     edit.setAttribute('aria-label','编辑这张照片的小注');
     // Supplied read-only fixtures have no IndexedDB record to edit.
-    edit.hidden=!photo.id||records(suppliedMemories).includes(photo);
+    edit.hidden=!photo.id||!photo.editable;
     actions.append(toFront,edit);surface.append(header,content,actions);back.append(surface);flipper.append(front,back);viewport.append(flipper);
     let flipped=false;
     function flip(value,{announce=true,focus=true}={}){

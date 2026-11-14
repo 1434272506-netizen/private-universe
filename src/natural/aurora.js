@@ -1,25 +1,26 @@
 import * as THREE from 'three';
 
 /**
- * 🌌 翡翠紫晶极光天幕 (Emerald & Amethyst Boreal Aurora)
+ * 🌌 翡翠紫晶丝滑极光天幕 (Emerald & Amethyst Silky Ribbon Aurora)
  * 
- * 基于 GitHub 顶流开源项目 candpixie/gliss 与 nimitz's "Auroras" (Shadertoy XtGGRt) 移植。
- * 采用三频程序化三角波噪声 (Tri-Noise & mm2 旋转变换)，0MB 外部贴图，纯 GPU 数学渲染。
+ * 采用多层正弦波折叠与垂向磁力线条纹算法 (Silky Harmonic Ray Curtains)，
+ * 彻底消除焦散噪点块与生硬高光死白，呈现天鹅绒般丝滑、空灵、梦幻的双星命定极光！
  * 
  * - 底部：代表她的翡翠碧绿 (#10b981)
- * - 顶部：代表你的紫罗兰晶紫 (#c084fc)
- * - 波峰交汇处：超热电离冷白光冕
+ * - 中部：流光碧青 (#06b6d4) 至浪漫薰衣草蓝 (#818cf8)
+ * - 顶部：代表你的深空晶紫 (#c084fc)
+ * - 纯净色温平滑过渡，无缝消隐于夜空深处
  */
 export function makeAurora(time) {
-  const radius = 58, height = 30;
-  // 构建横跨北天低空地平线的圆弧面片 (约 150 度展角，面向浮岛中心)
+  const radius = 115, height = 92;
+  // 横跨北天低空至天顶深空的开阔弧形光幕 (约 175 度展角)
   const geometry = new THREE.CylinderGeometry(
-    radius, radius, height, 48, 8, true, Math.PI * 0.65, Math.PI * 0.85
+    radius, radius, height, 64, 20, true, Math.PI * 0.55, Math.PI * 0.95
   );
 
   const uniforms = {
     uTime: time,
-    uOpacity: { value: 0 } // 由氛围系统 (benchAtmosphere) 在进入 night 时余弦插值至 0.85
+    uOpacity: { value: 0 } // 由 benchAtmosphere 控制昼夜淡入淡出
   };
 
   const material = new THREE.ShaderMaterial({
@@ -31,6 +32,7 @@ export function makeAurora(time) {
     vertexShader: `
       varying vec2 vUv;
       varying vec3 vWorld;
+
       void main() {
         vUv = uv;
         vec4 world = modelMatrix * vec4(position, 1.0);
@@ -44,79 +46,73 @@ export function makeAurora(time) {
       varying vec2 vUv;
       varying vec3 vWorld;
 
-      // --- nimitz Tri-Noise 极光波纹核心算法 ---
-      mat2 mm2(in float a) {
-        float c = cos(a), s = sin(a);
-        return mat2(c, s, -s, c);
-      }
-
-      float tri(in float x) {
-        return clamp(abs(fract(x) - 0.5), 0.01, 0.49);
-      }
-
-      vec2 tri2(in vec2 p) {
-        return vec2(tri(p.x) + tri(p.y), tri(p.y + tri(p.x)));
-      }
-
-      float triNoise2d(in vec2 p, float spd) {
-        float z = 1.6;
-        float z2 = 2.4;
-        float rz = 0.0;
-        p *= mm2(p.x * 0.05);
-        vec2 bp = p;
-        for (float i = 0.0; i < 3.0; i++) {
-          vec2 dg = tri2(bp * 1.75) * 0.72;
-          dg *= mm2(uTime * spd);
-          p -= dg / z2;
-          bp *= 1.35;
-          z2 *= 0.46;
-          z *= 0.44;
-          p *= 1.22 + (rz - 1.0) * 0.02;
-          rz += tri(p.x + tri(p.y)) * z;
-          p *= -mm2(uTime * spd * 0.25);
-        }
-        return clamp(1.0 / pow(rz * 26.0, 1.25), 0.0, 0.65);
-      }
-
       void main() {
         if (uOpacity <= 0.001) {
           discard;
         }
 
-        // 沿天际线流转的极光坐标
-        vec2 p = vec2(vUv.x * 7.5, vUv.y * 3.2);
-        
-        // 纵向丝幔折叠与微澜
-        float curtain = triNoise2d(p + vec2(uTime * 0.04, 0.0), 0.08);
-        float wisp = triNoise2d(p * 1.8 + vec2(-uTime * 0.025, uTime * 0.015), 0.05);
-        float auroraPattern = curtain * 0.72 + wisp * 0.28;
+        // 沿极光弧线的空灵波动位移
+        float t = uTime * 0.022;
+        float wave = sin(vUv.x * 5.2 + t * 1.5) * 0.09 
+                   + sin(vUv.x * 11.4 - t * 0.9) * 0.045
+                   + sin(vUv.x * 21.0 + t * 2.1) * 0.018;
 
-        // 柔和边缘衰减：底部近地平线羽化、顶部深空羽化、左右两侧弧形羽化
-        float yFade = smoothstep(0.02, 0.28, vUv.y) * smoothstep(0.98, 0.55, vUv.y);
-        float xFade = smoothstep(0.0, 0.20, vUv.x) * smoothstep(1.0, 0.80, vUv.x);
+        float u = vUv.x * 14.0 + t * 0.8;
+        float v = vUv.y * 3.6;
+
+        // 1. 丝绢主折叠光幔 (Primary Silky Folds)
+        float fold1 = sin(u + sin(v * 1.4 + t * 1.2) * 1.85) * 0.5 + 0.5;
+        fold1 = pow(fold1, 2.6);
+
+        // 2. 磁力线垂向缕状细纹 (Vertical Magnetic Striations - 丝幔质感)
+        float ray1 = sin(u * 2.8 - v * 0.75 - t * 0.7) * 0.5 + 0.5;
+        ray1 = pow(ray1, 3.2);
+
+        float ray2 = sin(u * 5.4 + v * 1.1 + t * 1.1) * 0.5 + 0.5;
+        ray2 = pow(ray2, 2.4);
+
+        // 3. 柔光底晕 (Ambient Undulating Haze)
+        float haze = sin(u * 0.7 + v * 0.45 + t * 0.5) * 0.5 + 0.5;
+        haze = pow(haze, 1.4);
+
+        // 合成丝滑光幕强度
+        float curtain = fold1 * 0.48 + ray1 * 0.28 + ray2 * 0.12 + haze * 0.22;
+
+        // 4. 超柔和天鹅绒级边缘消隐与天顶平滑消融 (彻底消除生硬切边与截断感)
+        float yFade = smoothstep(0.01, 0.20, vUv.y) * pow(1.0 - smoothstep(0.45, 0.96, vUv.y), 1.5);
+        float xFade = sin(vUv.x * 3.14159265);
+        xFade = pow(max(0.0, xFade), 1.6);
         float alphaMask = yFade * xFade;
 
-        // 浪漫双星命定色谱：
-        // 底部翡翠碧绿 (#10b981) -> 顶部紫罗兰晶紫 (#c084fc) -> 核心交汇处纯白电离光冕
-        vec3 emeraldColor = vec3(0.06, 0.75, 0.52); // 翡翠碧绿
-        vec3 amethystColor = vec3(0.76, 0.52, 0.98); // 紫罗兰晶紫
-        vec3 coronaWhite = vec3(1.15, 1.25, 1.35);   // 冷白高温光冕
+        // 5. 纯净4阶双星命定色谱映射 (饱和鲜活，绝不发灰、绝无死白)
+        vec3 cEmerald  = vec3(0.06, 0.85, 0.56);  // 底部：清透翡翠碧绿
+        vec3 cTeal     = vec3(0.12, 0.78, 0.90);  // 中低：流光碧青
+        vec3 cLavender = vec3(0.56, 0.54, 0.98);  // 中高：浪漫薰衣草蓝
+        vec3 cAmethyst = vec3(0.78, 0.45, 0.96);  // 顶部：深空晶紫
 
-        // 垂直高度色谱映射
-        vec3 auroraColor = mix(emeraldColor, amethystColor, smoothstep(0.20, 0.75, vUv.y));
-        // 在强折叠光束波峰处融入高温白光
-        auroraColor = mix(auroraColor, coronaWhite, pow(auroraPattern, 2.5) * 1.8);
+        float curY = clamp(vUv.y + wave * 0.85, 0.0, 1.0);
+        vec3 auroraColor;
+        if (curY < 0.35) {
+          auroraColor = mix(cEmerald, cTeal, smoothstep(0.06, 0.35, curY));
+        } else if (curY < 0.68) {
+          auroraColor = mix(cTeal, cLavender, smoothstep(0.35, 0.68, curY));
+        } else {
+          auroraColor = mix(cLavender, cAmethyst, smoothstep(0.68, 0.95, curY));
+        }
 
-        float finalAlpha = auroraPattern * alphaMask * uOpacity * 1.6;
-        gl_FragColor = vec4(auroraColor * (1.2 + auroraPattern), clamp(finalAlpha, 0.0, 1.0));
+        // 柔和光感辐射 (高光处更加通透晶莹，不失真成白斑)
+        float radiance = curtain * alphaMask * uOpacity;
+        vec3 finalColor = auroraColor * (radiance * 1.5 + pow(radiance, 2.0) * 0.55);
+
+        gl_FragColor = vec4(finalColor, clamp(radiance * 1.15, 0.0, 1.0));
       }
     `
   });
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'emerald-amethyst-aurora';
-  // 悬挂于浮岛后方地平线高度
-  mesh.position.set(0, 15, -4);
+  // 悬挂于浮岛后方地平线高度至天顶
+  mesh.position.set(0, 32, -15);
   mesh.rotation.y = -0.32; // 对齐长椅北向视野
 
   return {

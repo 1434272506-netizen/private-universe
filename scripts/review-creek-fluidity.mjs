@@ -32,6 +32,7 @@ try{
   await check('GPU pixels show moving ripples, downstream foam, crest surge and sunlight glints',async()=>{
     metrics=await page.evaluate(async()=>{
       const THREE=await import('/node_modules/three/build/three.module.js');
+      const {creekX,creekSlope}=await import('/src/natural/land.js');
       const p=window.__PU,water=p.scene.getObjectByName('creek-surface'),u=water.material.userData.currentUniforms;
       const scene=new THREE.Scene(),copy=new THREE.Mesh(water.geometry,water.material);scene.add(copy);
       scene.add(new THREE.HemisphereLight('#ffffff','#608578',1.2));
@@ -53,7 +54,7 @@ try{
         u.uGlintStrength.value=1;const sparkling=render(0,0),glints=difference(moved,sparkling);u.uGlintStrength.value=0;
         const wakeBase=render(0,0);u.uWakeStrength.value=1;const wake=render(0,0),wakes=difference(wakeBase,wake);
         let upstream=0,downstream=0;
-        const direction=new THREE.Vector2(.73+.533*Math.cos(-.25*.82),1).normalize(),origin=u.uStonePositions.value[2];
+        const direction=new THREE.Vector2(creekSlope(-.25),1).normalize(),origin=u.uStonePositions.value[2];
         for(let y=0;y<h;y++)for(let x=0;x<w;x++){
           const i=(y*w+x)*4,d=Math.abs(wake[i]-wakeBase[i])+Math.abs(wake[i+1]-wakeBase[i+1])+Math.abs(wake[i+2]-wakeBase[i+2]);
           if(d<12)continue;
@@ -61,7 +62,7 @@ try{
           if(point.dot(direction)>.1)downstream++;else upstream++;
         }
         u.uWakeStrength.value=0;
-        const end=u.uWaterEnd.value,endX=.15+end*.73+.65*Math.sin(end*.82);
+        const end=u.uWaterEnd.value,endX=creekX(end);
         const noCrest=render(endX,end-.25);u.uCrestStrength.value=1;const crest=difference(noCrest,render(endX,end-.25));
         let visible=0,transparent=0;for(let i=3;i<still.length;i+=4){if(still[i]>0){visible++;if(still[i]<150)transparent++;}}
         return {movement,glints,wakes,crest,downstream,upstream,visible,transparent};

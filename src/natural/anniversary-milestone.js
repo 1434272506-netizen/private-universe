@@ -31,20 +31,88 @@ function endGrain() {
 
 export function makeMilestone(island,{moveTo,frame,onOpen,onClose,stargaze,currentView}) {
   const plaque=new THREE.Group();plaque.name='anniversary-milestone';
-  plaque.userData.interaction='anniversary';plaque.position.set(-1.55,ground(-1.55,.55),.55);
-  const bark=new THREE.CylinderGeometry(.35,.40,.46,32);
-  const pos=bark.attributes.position;
-  for(let i=0;i<pos.count;i++){
-    const x=pos.getX(i),z=pos.getZ(i);
-    const ridge=1+.025*Math.sin(11*Math.atan2(z,x));
-    pos.setXYZ(i,x*ridge,pos.getY(i)-z*.32,z*ridge);
-  }
-  bark.computeVertexNormals();
-  const trunk=new THREE.Mesh(bark,new THREE.MeshStandardMaterial({color:'#684b35',roughness:1}));
-  trunk.position.y=.23;plaque.add(trunk);
-  const face=new THREE.Mesh(new THREE.CircleGeometry(.345,48),
-    new THREE.MeshStandardMaterial({map:endGrain(),roughness:.86}));
-  face.rotation.x=-Math.PI/2+.31;face.position.y=.47;plaque.add(face);island.add(plaque);
+  const x=-12.0,z=-1.5;
+  plaque.userData.interaction='anniversary';plaque.position.set(x,ground(x,z),z);
+
+  // 告别呆板切断木桩，重塑为：浪漫精致的【星轨时光浑天日晷 (Celestial Brass Astrolabe)】
+  // A. 汉白玉叠级打磨原石基座 (Tiered Marble Base)
+  const stoneMat = new THREE.MeshStandardMaterial({
+    color: '#e2e8f0',
+    roughness: 0.65,
+    metalness: 0.05
+  });
+  const base1 = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.42, 0.09, 24), stoneMat);
+  base1.position.y = 0.045;
+  base1.castShadow = true;
+  base1.receiveShadow = true;
+  plaque.add(base1);
+
+  const base2 = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 0.07, 24), stoneMat);
+  base2.position.y = 0.125;
+  base2.castShadow = true;
+  base2.receiveShadow = true;
+  plaque.add(base2);
+
+  // B. 复古黄铜支柱与承托座 (Antique Brass Mounting)
+  const brassMat = new THREE.MeshStandardMaterial({
+    color: '#d97706',
+    roughness: 0.28,
+    metalness: 0.85
+  });
+
+  const column = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.034, 0.26, 12), brassMat);
+  column.position.y = 0.29;
+  column.castShadow = true;
+  plaque.add(column);
+
+  const bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.020, 0.05, 16), brassMat);
+  bracket.position.y = 0.44;
+  plaque.add(bracket);
+
+  // C. 浑天黄铜双环与极轴日晷指针 (Armillary Celestial Rings & Gnomon)
+  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.014, 8, 36), brassMat);
+  ring1.rotation.x = 0.58;
+  ring1.position.y = 0.60;
+  ring1.castShadow = true;
+  plaque.add(ring1);
+
+  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.012, 8, 36), brassMat);
+  ring2.rotation.y = 0.75;
+  ring2.rotation.z = 0.38;
+  ring2.position.y = 0.60;
+  ring2.castShadow = true;
+  plaque.add(ring2);
+
+  const gnomon = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.52, 8), brassMat);
+  gnomon.rotation.z = 0.65;
+  gnomon.position.y = 0.60;
+  gnomon.castShadow = true;
+  plaque.add(gnomon);
+
+  // D. 核心时光星核发光水晶球 (Luminous Time Core)
+  const crystalMat = new THREE.MeshStandardMaterial({
+    color: '#fffbeb',
+    emissive: '#fde047',
+    emissiveIntensity: 0.42,
+    roughness: 0.15,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.92
+  });
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.068, 20, 16), crystalMat);
+  core.position.y = 0.60;
+  plaque.add(core);
+
+  // 核心微弱暖光
+  const coreLight = new THREE.PointLight('#fef08a', 0.55, 2.5, 1.6);
+  coreLight.position.y = 0.60;
+  plaque.add(coreLight);
+
+  const patioRing=new THREE.Mesh(new THREE.CylinderGeometry(.56,.62,.035,24),stoneMat);
+  patioRing.name='patioRing';patioRing.position.y=.0175;patioRing.receiveShadow=true;
+  plaque.add(patioRing);
+
+  island.add(plaque);
 
   const card=document.createElement('dialog');card.id='anniversary-card';
   card.setAttribute('aria-labelledby','anniversary-title');
@@ -60,8 +128,8 @@ export function makeMilestone(island,{moveTo,frame,onOpen,onClose,stargaze,curre
     if(card.open)return;
     previous=currentView();
     onOpen();
-    const focus=plaque.position.clone().add(new THREE.Vector3(0,.37,0));
-    moveTo(focus.clone().add(new THREE.Vector3(.72,.75,1.65)),focus,{duration:1.0,min:1});
+    const focus=plaque.position.clone().add(new THREE.Vector3(0,.52,0));
+    moveTo(focus.clone().add(new THREE.Vector3(.68,.68,1.55)),focus,{duration:1.0,min:1});
     refresh();
     card.showModal();
     timer=setInterval(refresh,60000);

@@ -69,8 +69,8 @@ try{
       assert.ok(Math.abs(result.min[axis]-result.recordedMin[axis])<.001);
       assert.ok(Math.abs(result.max[axis]-result.recordedMax[axis])<.001);
     }
-    assert.ok(result.size[0]>=9.5&&result.size[0]<=12.5,`Tree width outside the intended 10–12m range: ${result.size[0]}`);
-    assert.ok(result.size[1]>=7&&result.size[1]<=9,`Tree height outside the intended 7.5–8.5m range: ${result.size[1]}`);
+    assert.ok(result.size[0]>=18&&result.size[0]<=21,`Tree width outside the intended 18–21m range: ${result.size[0]}`);
+    assert.ok(result.size[1]>=14.5&&result.size[1]<=15.5,`Tree height outside the intended 14.5–15.5m range: ${result.size[1]}`);
     return result;
   });
   await check('Unique exported RibbonAnchor, ribbon and scene interaction coordinates agree',async()=>{
@@ -198,6 +198,28 @@ try{
     return restored;
   });
   await check('The normal loading and interaction path has no JavaScript or WebGL errors',async()=>assert.deepEqual(errors,[]));
+
+  await check('Manor layout and porch lighting follow the three atmosphere modes',async()=>{
+    const layout=await page.evaluate(()=>{
+      const {scene,props,treeAsset}=window.__PU;
+      const cabin=scene.getObjectByName('secret-haven-cabin');
+      const porch=scene.getObjectByName('porch-warm-light');
+      return {tree:treeAsset.tree.position.toArray(),cabin:cabin.position.toArray(),
+        distance:cabin.position.distanceTo(props.bench.position),daylight:porch.intensity};
+    });
+    assert.equal(layout.tree[0],-11);assert.equal(layout.tree[2],-4.5);
+    assert.equal(layout.cabin[0],-6.5);assert.equal(layout.cabin[2],.5);
+    assert.ok(layout.distance>17.5&&layout.distance<18);
+    assert.equal(layout.daylight,0);
+    await page.setViewportSize({width:1920,height:1080});
+    await page.locator('[data-atmo="sunset"]').click();
+    await page.waitForFunction(()=>window.__PU.scene.getObjectByName('porch-warm-light').intensity>17.63);
+    await page.screenshot({path:'screenshots/07-millennial-tree-and-cabin.png',
+      style:'#garden-ui,#loading,#object-hint{visibility:hidden!important}'});
+    await page.locator('[data-atmo="night"]').click();
+    await page.waitForFunction(()=>window.__PU.scene.getObjectByName('porch-warm-light').intensity===28);
+    return layout;
+  });
 
   const failureContext=await browser.newContext({viewport:{width:1600,height:1000},deviceScaleFactor:1});
   const failurePage=await failureContext.newPage();

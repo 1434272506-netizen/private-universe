@@ -9,8 +9,10 @@ try{
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.goto(process.env.PREVIEW_URL||'http://127.0.0.1:5173/');
   await page.locator('#enter-direct').click({timeout:90000});
-  const point=await page.evaluate(()=>{
+  await page.locator('#invitation').waitFor({state:'hidden'});
+  const point=await page.evaluate(async()=>{
     const p=window.__PU;p.frame('tree');
+    await new Promise(requestAnimationFrame);
     const face=p.scene.getObjectByName('anniversary-milestone').children[1];
     const v=face.getWorldPosition(p.camera.position.clone()).project(p.camera);
     return [(1+v.x)*innerWidth/2,(1-v.y)*innerHeight/2];
@@ -25,11 +27,11 @@ try{
     const p=window.__PU,sky=p.scene.getObjectByName('private-constellations');
     return [sky.visible,p.currentView,Math.asin(p.camera.getWorldDirection(p.camera.position.clone()).y)*180/Math.PI,
       sky.getObjectByName('sagittarius-teapot').geometry.attributes.position.count,
-      sky.getObjectByName('taurus-hyades').geometry.attributes.position.count,sky.getObjectByName('starlight-heart').children.length];
+      sky.getObjectByName('taurus-hyades').geometry.attributes.position.count,Boolean(sky.getObjectByName('starlight-heart'))];
   });
   const [visible,view,angle,...counts]=await inspect();
   assert.ok(visible && view==='bench' && Math.abs(angle-75)<.02);
-  assert.deepEqual(counts,[8,13,3]);
+  assert.deepEqual(counts,[8,13,false]);
   for(const action of ['Escape','button']){
     if(action==='button'){
       await page.locator('#stargaze').click();

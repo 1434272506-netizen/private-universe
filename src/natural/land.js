@@ -2,10 +2,22 @@ import * as THREE from 'three';
 import {fbm, noise, hash, mesh} from './shared.js';
 import {material, rockMaterial} from './materials.js';
 
-export const RX = 9.5, RZ = 5.35;
+export const RX = 24.0, RZ = 14.0;
+export const CLIFF_DEPTH = 12.0;
+export const TREE_SITE = {x:-11.0,z:-4.5};
+export const CABIN_SITE = {x:-6.5,z:0.5,yaw:Math.PI / 3};
+export function onCabinFloor(x,z,margin=0) {
+  const dx=x-CABIN_SITE.x,dz=z-CABIN_SITE.z;
+  const across=dx*Math.cos(CABIN_SITE.yaw)-dz*Math.sin(CABIN_SITE.yaw);
+  const forward=dx*Math.sin(CABIN_SITE.yaw)+dz*Math.cos(CABIN_SITE.yaw);
+  return Math.abs(across)<2.25+margin && forward>-1.8-margin && forward<3.62+margin;
+}
+export const BENCH_SITE = {x:11.0,z:3.0};
 export const boundary = a => 1 + .075 * Math.sin(a * 3 + .4) + .058 * Math.cos(a * 5 - 1) + .025 * Math.sin(a * 9 + .7);
 export const inside = (x, z, margin = 1) => Math.hypot(x / RX, z / RZ) < boundary(Math.atan2(z / RZ, x / RX)) * margin;
-export const creekX = z => .15 + z * .73 + .65 * Math.sin(z * .82);
+export const creekX = z => .12 + z * .73 + 1.32 * Math.sin(z * .46);
+// Tangent in the downstream (+z) direction, shared by the wake shader and the shore tests.
+export const creekSlope = z => .73 + 1.32 * .46 * Math.cos(z * .46);
 export const waterY = z => .20 - z * .018;
 export const creekWidth = z => .43 + .08 * Math.sin(z * 1.4);
 
@@ -13,13 +25,17 @@ export const creekWidth = z => .43 + .08 * Math.sin(z * 1.4);
 export function ground(x, z) {
   const d = Math.abs(x - creekX(z)) / 1.2, w = creekWidth(z);
   const bank = THREE.MathUtils.smoothstep(d, w * .6, w + 1.05);
-  const terrain = .45 + fbm(x * .45 + 10, z * .45) * .55 + .09 * Math.sin(x * .7 + z * .4);
+  const upland = .52 * Math.exp(-((x-TREE_SITE.x)**2 / 30 + (z-TREE_SITE.z)**2 / 18));
+  const terrain = upland + .45 + fbm(x * .45 + 10, z * .45) * .55 + .09 * Math.sin(x * .7 + z * .4);
   return THREE.MathUtils.lerp(waterY(z) - .19, terrain, bank) + .014 * noise(x * 13, z * 13);
 }
 
 let exitZ = 3;
 while (inside(creekX(exitZ), exitZ, .999)) exitZ += .005;
 export const WATER_END = exitZ;
+let sourceZ = 0;
+while (inside(creekX(sourceZ), sourceZ, .98)) sourceZ -= .01;
+export const WATER_START = sourceZ;
 
 /** The distant option shares the silhouette without paying for hero geometry. */
 export function makeLand(scene, {detail = 'hero'} = {}) {
@@ -44,7 +60,7 @@ export function makeLand(scene, {detail = 'hero'} = {}) {
       const turf = fbm(x * 3.7 + 31, z * 3.7 - 17);
       const wet = 1 - THREE.MathUtils.smoothstep(Math.abs(x - creekX(z)), .55, 1.22);
       // The broken, soft soil patch belongs to the tree's root plate, not a disk.
-      const rootDistance = Math.hypot((x + 4.1) / 1.8, (z + .6) / 1.45);
+      const rootDistance = Math.hypot((x - TREE_SITE.x) / 3.2, (z - TREE_SITE.z) / 2.6);
       const rootSoil = 1 - THREE.MathUtils.smoothstep(rootDistance + (fbm(x * 2, z * 2) - .5) * .42, .36, 1.16);
       c.copy(meadow).lerp(meadowLight, f * .79 + turf * .21);
       c.multiplyScalar(.87 + turf * .23);
@@ -90,12 +106,13 @@ export function makeLand(scene, {detail = 'hero'} = {}) {
       const cutMask = THREE.MathUtils.smoothstep(t,.025,.12) * Math.pow(Math.max(0,1 - t),.35);
       const erosion = ((weather - .5) * .070 + plane * .067 + smallErosion * .022) * envelope;
       const taper = Math.pow(Math.max(0,1 - Math.pow(t,2.3)),.80);
-      const radius = Math.max(0,taper + erosion - fracture * cutMask) * b;
+      const strata = .026 * Math.sin(t * 24 + weather * 4) * envelope;
+      const radius = Math.max(0,taper + erosion + strata - fracture * cutMask) * b;
       let x = ca * RX * radius - .83 * t * t;
       let z = sa * RZ * radius + .32 * t * t;
-      let y = ground(ca * RX * b,sa * RZ * b) - t * 5.65;
+      let y = (1-t) * ground(ca * RX * b,sa * RZ * b) + t * (.7 - CLIFF_DEPTH);
       y += (.19 * Math.sin(a * 3 + .8) + plane * .29 + (weather - .5) * .21) * envelope;
-      if (j === levels) { x = -.83; z = .32; y = -4.98; }
+      if (j === levels) { x = -.83; z = .32; y = .7 - CLIFF_DEPTH; }
       rv.push(x, y, z);
       ruv.push(a * 1.1, t * 1.4);
       const rockReveal = THREE.MathUtils.smoothstep(t, .052, .13);

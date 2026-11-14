@@ -1,3 +1,4 @@
+import {memoryDisplay} from './memory-display.js';
 import {loadLocalContent,saveLocalMemory,saveLocalLetter,deleteLocalContent,downloadContentBackup,restoreContentBackup} from './local-content.js';
 import {importProvidedPhotos} from './photo-import.js';
 import {stageEditorDraft,readEditorDraft,getEditorDraftRecord,writeEditorDraft,forgetEditorDraftJournal,watchEditorDrafts} from './editor-drafts.js';
@@ -209,15 +210,18 @@ export function prepareContentEditor({onChange,onOpen=()=>{},onClose=()=>{}}){
       if(kind==='memory'){const image=node('img','saved-thumbnail');image.src=record.image;image.alt='';image.loading='lazy';item.append(image);}
       else {const mark=node('span','saved-letter-mark','✉');mark.dataset.identity=record.identity;mark.setAttribute('aria-hidden','true');item.append(mark);}
       const description=node('div','saved-description');
-      const title=kind==='memory'?(record.caption||'一张照片'):(record.title||'一封信');
-      description.append(node('strong',null,title),node('small',null,[kind==='letter'?record.from:'',record.date].filter(Boolean).join(' · ')||'日期留白'));
+      const display=kind==='memory'?memoryDisplay(record):record;
+      const title=kind==='memory'?display.title:(record.title||'一封信');
+      description.append(node('strong',null,title),node('small',null,[kind==='letter'?record.from:'',display.date].filter(Boolean).join(' · ')||'日期留白'));
       const actions=node('div','saved-actions');
-      const edit=action('编辑',()=>kind==='memory'?editMemory(record):editLetter(record));edit.setAttribute('aria-label',`编辑${title}`);
+      // Keep the existing action names stable; richer fallbacks belong to the visible list text.
+      const actionTitle=kind==='memory'?(record.caption||'一张照片'):title;
+      const edit=action('编辑',()=>kind==='memory'?editMemory(record):editLetter(record));edit.setAttribute('aria-label',`编辑${actionTitle}`);
       const remove=action('移除',()=>{
         if(busy)return;
         actions.replaceChildren(action('确认移除',()=>removeRecord(kind,record.id)),action('保留',()=>actions.replaceChildren(edit,remove)));
         actions.firstElementChild.focus();
-      });remove.setAttribute('aria-label',`移除${title}`);actions.append(edit,remove);item.append(description,actions);list.append(item);
+      });remove.setAttribute('aria-label',`移除${actionTitle}`);actions.append(edit,remove);item.append(description,actions);list.append(item);
     });
   }
   async function reload(){

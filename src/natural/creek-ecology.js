@@ -487,6 +487,9 @@ export function makeCreekEcology(parent, options = {}) {
       entity.x = entity.safeX;
       entity.z = entity.safeZ;
       y = entity.safeY;
+      // A turtle that keeps paddling into the same shallow footprint never
+      // leaves its last safe pose. Turn back toward the submerged corridor.
+      if(isTurtle){entity.heading+=Math.PI;entity.targetHeading=entity.heading;}
     }
     if (y === null) {
       for (let z = zMin + margin; z <= zMax - margin && y === null; z += .025) {

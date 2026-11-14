@@ -5,7 +5,7 @@ import {makeMistRainbow} from './rainbow.js';
 
 export function makeAtmosphere(scene,renderer,time){
   const sunDirection=new THREE.Vector3(-11,10.5,7.5).normalize();
-  const sky=new Sky();sky.name='spring-sky';sky.scale.setScalar(240);sky.renderOrder=-20;
+  const sky=new Sky();sky.name='spring-sky';sky.scale.setScalar(360);sky.renderOrder=-20;
   const uniforms=sky.material.uniforms;
   uniforms.sunPosition.value.copy(sunDirection).multiplyScalar(450000);
   uniforms.turbidity.value=1.8;uniforms.rayleigh.value=2.5;
@@ -151,7 +151,17 @@ export function makeAtmosphere(scene,renderer,time){
     vec3 darkSky = mix(vec3(0.014, 0.024, 0.060), vec3(0.042, 0.062, 0.105), horizon);
     vec3 dark = darkSky + galaxyLight + moonBody + corona;
     gl_FragColor = vec4(mix(texColor, dark, night), 1.0);`);
-  sky.material.customProgramCacheKey=()=> 'spring-floating-sky-v2';
+  // At the two settled endpoints the other sky has exactly zero blend weight.
+  // Skip that hidden FBM/scattering work; transitions retain both original paths.
+  if(import.meta.env.DEV)sky.material.userData.referenceFragmentShader=sky.material.fragmentShader;
+  sky.material.fragmentShader=sky.material.fragmentShader
+    .replace('float horizon = exp(-abs(direction.y) * 3.7);','')
+    .replace('vec3 direction = normalize( vWorldPosition - cameraPosition );',
+      'vec3 direction = normalize( vWorldPosition - cameraPosition );\nvec3 texColor=vec3(0.0);\nfloat horizon=exp(-abs(direction.y)*3.7);\nif(night<1.0){')
+    .replace('vec3 texColor = ( Lin + L0 )','texColor = ( Lin + L0 )')
+    .replace('vec3 moonDir=normalize(vec3(-.88,.165,-.72));','}\nif(night>0.0){\nvec3 moonDir=normalize(vec3(-.88,.165,-.72));')
+    .replace('gl_FragColor = vec4(mix(texColor, dark, night), 1.0);','texColor=mix(texColor,dark,night);\n}\ngl_FragColor=vec4(texColor,1.0);');
+  sky.material.customProgramCacheKey=()=> 'spring-floating-sky-visible-branches-v3';
   scene.add(sky);
   if(scene.fog)scene.fog.color.set('#d8e4e7');
   // Bake diffuse reflections without the tiny high-energy solar disc.

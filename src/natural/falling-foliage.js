@@ -88,7 +88,7 @@ export function createFallingFoliage(scene,{ground=()=>.8,seed=7241,reducedMotio
   let clock=0,updates=0,recycles=0,disposed=false;
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
   function reset(p,initial=false){
-    if(p.kind===0){p.x=-4.5+random()*5;p.z=-1.2+random()*4.4;p.y=3.8+random()*4;p.airborne=true;}
+    if(p.kind===0){p.x=-13+random()*8;p.z=-5.4+random()*6;p.y=7+random()*5;p.airborne=true;}
     else{const patch=patches[p.index%patches.length];p.x=patch[0]+(random()-.5)*.7;p.z=patch[1]+(random()-.5)*.7;p.y=ground(p.x,p.z)+.05;p.airborne=false;}
     p.floor=ground(p.x,p.z)+.05;p.age=initial?1:0;p.airTime=0;p.vx=p.vz=0;p.vy=0;p.life=34+random()*12;if(!initial)recycles++;
   }
@@ -134,7 +134,7 @@ export function createFallingFoliage(scene,{ground=()=>.8,seed=7241,reducedMotio
         if(groundSeed){p.vy+=.65*gust*p.lift*dt;p.vy+=(-.06-p.vy)*(1-Math.exp(-.32*p.drag*dt));}
         else p.vy+=(-.18*p.speed+.42*gust*p.lift+Math.sin(clock*p.rockRate+p.phase)*.08-p.vy)*drag;
         p.x+=p.vx*dt;p.z+=p.vz*dt;p.y+=p.vy*dt;
-        if(p.y<ground(p.x,p.z)+.025||p.x>10||p.y>9.5||p.age>p.life)reset(p);
+        if(p.y<ground(p.x,p.z)+.025||p.x>10||p.y>16.5||p.age>p.life)reset(p);
       }
       write(p);
     }

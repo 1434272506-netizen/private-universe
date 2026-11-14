@@ -8,5 +8,8 @@ work/
 /preview-v0.1.png
 screenshots/*
 !screenshots/mother_tree_*.jpg
+!screenshots/07-millennial-tree-and-cabin.png
 *.log
 .DS_Store
+
+/release/

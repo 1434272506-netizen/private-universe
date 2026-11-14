@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
-import {ground} from './land.js';
+import {fbm} from './shared.js';
+import {ground,TREE_SITE} from './land.js';
 import {createAnchoredRibbon} from './ribbon.js';
+import {publicAssetURL} from '../public-assets.js';
 
 /** Load the authored asset before the garden registers views and interactions. */
-export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BASE_URL}models/love-tree.glb`}={}){
+export async function loadCenterpieceTree(parent,time,{url=publicAssetURL('models/love-tree.glb')}={}){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),45000);
   let gltf;
@@ -16,7 +18,8 @@ export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BA
 
   const tree=gltf.scene;
   tree.name='centerpiece-love-tree';
-  tree.position.set(-4.1,ground(-4.1,-.6),-.6);
+  tree.position.set(TREE_SITE.x,ground(TREE_SITE.x,TREE_SITE.z),TREE_SITE.z);
+  tree.scale.set(1.75, 1.75, 1.75);
   const anchor=tree.getObjectByName('RibbonAnchor');
   if(!anchor)throw new Error('Tree asset must contain RibbonAnchor');
   const trunkMeshes=[];
@@ -26,7 +29,7 @@ export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BA
     triangles+=(object.geometry.index?.count??object.geometry.attributes.position.count)/3;
     object.castShadow=true;object.receiveShadow=true;
     const materials=Array.isArray(object.material)?object.material:[object.material];
-    const isFoliage=materials.some(material=>/leaves|foliage/i.test(material?.name??''))||/leaves|foliage/i.test(object.name);
+    const isFoliage=object.name==='Leaves_ContinuousUmbrella'||materials.some(material=>/leaves|foliage/i.test(material?.name??''))||/leaves|foliage/i.test(object.name);
     if(isFoliage){
       leafMeshes++;object.userData.gardenFoliage=true;
       for(const material of materials){
@@ -37,8 +40,17 @@ export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BA
       }
     }else{
       trunkMeshes.push(object);
+      const pos=object.geometry.attributes.position,normals=object.geometry.attributes.normal;
+      const moss=new Float32Array(pos.count*3);
+      for(let i=0;i<pos.count;i++){
+        const x=pos.getX(i),y=pos.getY(i),z=pos.getZ(i);
+        const growth=(1-THREE.MathUtils.smoothstep(y,.2,1.9))*Math.max(0,normals.getY(i))
+          *THREE.MathUtils.smoothstep(fbm(x*2,z*2),.32,.64);
+        moss.set([1-growth*.41,1+growth*.42,1-growth*.36],i*3);
+      }
+      object.geometry.setAttribute('color',new THREE.BufferAttribute(moss,3));
       for(const material of materials){
-        material.roughness=.95;
+        material.vertexColors=true;material.roughness=.95;
         material.color.multiply(new THREE.Color().setRGB(.82,.71,.57));
       }
     }
@@ -46,6 +58,14 @@ export async function loadCenterpieceTree(parent,time,{url=`${import.meta.env.BA
   if(!trunkMeshes.length||!leafMeshes)throw new Error('Tree asset requires bark and foliage meshes');
   parent.add(tree);parent.updateWorldMatrix(true,true);
   const ribbon=createAnchoredRibbon(anchor,time);
+  // These ties use vertices on the authored branches, in tree-local metres.
+  const redSilk=ribbon.material.clone();
+  redSilk.color.set('#ac3433');redSilk.onBeforeCompile=ribbon.material.onBeforeCompile;
+  redSilk.customProgramCacheKey=ribbon.material.customProgramCacheKey;
+  for(const point of [[-.767,3.408,2.616],[2.651,5.155,.505]]){
+    const tie=new THREE.Mesh(ribbon.geometry,redSilk);
+    tie.name='branch-red-silk';tie.userData.interaction='ribbon';tie.scale.setScalar(.79);tie.position.set(...point);tree.add(tie);
+  }
   parent.updateWorldMatrix(true,true);
   const ribbonAnchor=ribbon.getWorldPosition(new THREE.Vector3());
   const bounds=new THREE.Box3().setFromObject(tree);

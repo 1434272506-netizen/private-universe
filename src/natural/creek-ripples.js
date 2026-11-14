@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { WATER_END } from './land.js';
+import { WATER_START, WATER_END } from './land.js';
 import { channelBounds } from './water.js';
 
 export function makeCreekRipples(renderer, time) {
   const SIM_W = 128, SIM_H = 512;
-  const START_Z = -4.8, END_Z = WATER_END;
+  const START_Z = WATER_START, END_Z = WATER_END;
   const LENGTH_Z = END_Z - START_Z;
 
   // 1. Dual-Buffer Ping-Pong Render Targets

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {mesh, rng, fbm} from './shared.js';
 import {material} from './materials.js';
-import {creekX, waterY, creekWidth, WATER_END, ground, inside} from './land.js';
+import {creekX, creekSlope, waterY, creekWidth, WATER_START, WATER_END, ground, inside} from './land.js';
 
 // Follow the terrain/water intersection so wakes reach the shallow outer stones.
 export function waterBankX(z,side){
@@ -20,8 +20,7 @@ export function channelBounds(z){
 
 // Channel coordinates keep the current flowing towards +z while orbiting.
 export function makeWater(parent, time) {
-  let start = -4.8;
-  while (!inside(creekX(start), start, .995)) start += .01;
+  const start = WATER_START;
   const positions = [], uvs = [], depths = [], indices = [], rows = 180, columns = 18;
   for (let j = 0; j <= rows; j++) {
     const z = start + (WATER_END - start) * j / rows;
@@ -107,8 +106,9 @@ export function currentMaterial(time) {
   const uniforms={
     uRippleSimTex:{value:null},uRippleStrength:{value:0},
     uTime:time,uMainSpeed:{value:WATER_DYNAMICS.mainSpeed},uDetailSpeed:{value:WATER_DYNAMICS.detailSpeed},
-    uWaveAmplitude:{value:WATER_DYNAMICS.amplitude},uWaterEnd:{value:WATER_END},
+    uWaveAmplitude:{value:WATER_DYNAMICS.amplitude},uWaterEnd:{value:WATER_END},uWaterStart:{value:WATER_START},
     uStonePositions:{value:STEPPING_STONES.map(p=>new THREE.Vector2(p.x,p.z))},
+    uStoneSlopes:{value:STEPPING_STONES.map(p=>creekSlope(p.z))},
     uShallowBlue:{value:new THREE.Color('#7dd3fc')},uShallowGreen:{value:new THREE.Color('#6ee7b7')},
     uDeepBlue:{value:new THREE.Color('#0284c7')},uDeepGreen:{value:new THREE.Color('#059669')},
     uGlintColor:{value:new THREE.Color(1,.96,.83)},uFoamColor:{value:new THREE.Color('#f8fafc')},
@@ -126,9 +126,10 @@ export function currentMaterial(time) {
       .replace('#include <common>',`#include <common>
 uniform sampler2D uRippleSimTex;
 uniform float uRippleStrength;
-uniform float uTime,uMainSpeed,uDetailSpeed,uWaveAmplitude,uWaterEnd;
+uniform float uTime,uMainSpeed,uDetailSpeed,uWaveAmplitude,uWaterEnd,uWaterStart;
 uniform float uWakeStrength,uCrestStrength,uGlintStrength;
 uniform vec2 uStonePositions[5];
+uniform float uStoneSlopes[5];
 uniform vec3 uGlintColor,uShallowBlue,uShallowGreen,uDeepBlue,uDeepGreen,uFoamColor,uSunDirection;
 varying vec2 vCurrentUv,vChannelPosition;
 varying float vWaterDepth;
@@ -148,7 +149,7 @@ float obstacleWake(vec2 point){
   float foam=0.0;
   for(int i=0;i<5;i++){
     vec2 stone=uStonePositions[i];
-    vec2 forward=normalize(vec2(.73+.533*cos(stone.y*.82),1.0));
+    vec2 forward=normalize(vec2(uStoneSlopes[i],1.0));
     vec2 relative=point-stone;
     float along=dot(relative,forward),across=dot(relative,vec2(forward.y,-forward.x));
     float tail=along-.13;
@@ -165,7 +166,7 @@ float obstacleWake(vec2 point){
   return clamp(foam,0.0,1.0);
 }`)
       .replace('#include <color_fragment>',`#include <color_fragment>
-vec2 simUv=vec2(vCurrentUv.x,(vCurrentUv.y+4.8)/(uWaterEnd+4.8));
+vec2 simUv=vec2(vCurrentUv.x,(vCurrentUv.y-uWaterStart)/(uWaterEnd-uWaterStart));
 float dynamicFoam=texture2D(uRippleSimTex,simUv).b*uRippleStrength;
 float edgeDistance=min(vCurrentUv.x,1.0-vCurrentUv.x);
 float bankFoam=(1.0-smoothstep(.008,.065,edgeDistance))

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {RoundedBoxGeometry} from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
-import {ground} from './land.js';
+import {ground,BENCH_SITE,CABIN_SITE,creekX} from './land.js';
 import {material} from './materials.js';
 import {mesh, curveTube} from './shared.js';
 
@@ -13,6 +13,7 @@ export function makeProps(parent) {
   const cream = new THREE.MeshStandardMaterial({color: '#dbd9ca', roughness: .74, metalness: .08});
   const doorCream = new THREE.MeshStandardMaterial({color: '#e6e1d1', roughness: .77, metalness: .06});
   const seam = new THREE.MeshStandardMaterial({color: '#666b60', roughness: .85});
+  makeStonePath(parent);
   const bench = makeBench(parent, oak, hardware);
   const {mailbox, doorPivot} = makeMailbox(parent, oak, cream, doorCream, seam, hardware);
   const {balloons, rigs} = makeBalloons(parent);
@@ -50,11 +51,36 @@ export function makeProps(parent) {
   };
 }
 
+// Two dry approaches meet the existing five stepping stones at the waterline.
+function makeStonePath(parent) {
+  const startX=CABIN_SITE.x+3.95*Math.sin(CABIN_SITE.yaw);
+  const startZ=CABIN_SITE.z+3.95*Math.cos(CABIN_SITE.yaw);
+  const bridgeWest = [-1.85, 0.15];
+  const bridgeEast = [1.85, -0.22];
+  const paths=[
+    [[startX,startZ],[-2.17,2.22],[-1.95,.72],bridgeWest],
+    [bridgeEast,[3.1,-.38],[6.0,1.15],[8.4,2.55],[BENCH_SITE.x-1.14,BENCH_SITE.z]]
+  ];
+  const slabs=[];
+  for(const points of paths){
+    const curve=new THREE.CatmullRomCurve3(points.map(([x,z])=>new THREE.Vector3(x,0,z)));
+    const count=Math.ceil(curve.getLength()/.67);
+    for(let i=0;i<=count;i++){
+      const {x,z}=curve.getPointAt(i/count);
+      const slab=new THREE.IcosahedronGeometry(1,0);
+      slab.scale(.28+.04*Math.sin(i*3),.072,.22);
+      slab.rotateY(i*2.4);slab.translate(x,ground(x,z)+.035,z);slabs.push(slab);
+    }
+  }
+  const path=mesh(parent,mergeGeometries(slabs),material('rock','#a9aa94'));
+  path.name='porch-to-bench-stone-path';slabs.forEach(g=>g.dispose());
+}
+
 function makeBench(parent, oak, hardware) {
   const bench = new THREE.Group();
   bench.name = 'oak-bench';
   bench.userData.interaction = 'bench';
-  const x = 4.2, z = 1.5, angle = -.2, base = ground(x, z);
+  const {x,z} = BENCH_SITE, angle = -1.72, base = ground(x, z);
   bench.position.set(x, base, z);
   bench.rotation.y = angle;
   parent.add(bench);

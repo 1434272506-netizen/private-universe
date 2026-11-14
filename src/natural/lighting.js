@@ -26,11 +26,11 @@ class GardenContactPass extends GTAOPass {
 
 export function makeLighting(renderer, scene, camera) {
   const target = new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
-  target.samples = Math.min(4, renderer.capabilities.maxSamples);
+  target.samples = Math.min(2, renderer.capabilities.maxSamples);
   const composer = new EffectComposer(renderer, target);
   const contact = new GardenContactPass(scene, camera, 1, 1);
-  contact.updateGtaoMaterial({radius: .48, thickness: .7, distanceExponent: 1.5, distanceFallOff: .8, scale: 1, samples: 12});
-  contact.updatePdMaterial({radius: 5, samples: 12});
+  contact.updateGtaoMaterial({radius: .48, thickness: .7, distanceExponent: 1.5, distanceFallOff: .8, scale: 1, samples: 8});
+  contact.updatePdMaterial({radius: 5, samples: 8});
   contact.blendIntensity = .44;
   composer.addPass(new RenderPass(scene, camera));
   composer.addPass(contact);
@@ -38,6 +38,10 @@ export function makeLighting(renderer, scene, camera) {
   renderer.info.autoReset = false;
   return {
     contact,
+    get quality() {
+      return {msaaSamples: target.samples, gtaoSamples: contact.gtaoMaterial.defines.SAMPLES,
+        denoiseSamples: contact.pdMaterial.defines.SAMPLES, pixelRatio: renderer.getPixelRatio(), canvasAntialias: renderer.getContext().getContextAttributes().antialias};
+    },
     resize(width, height) {
       composer.setPixelRatio(renderer.getPixelRatio());
       composer.setSize(width, height);

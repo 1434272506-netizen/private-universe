@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {publicAssetURL} from '../public-assets.js';
+import {starTexture} from './star-texture.js';
 
 // J2000 right ascension (degrees) and declination. Project each asterism
 // independently so both distant sky regions fit in one keepsake view.
@@ -15,19 +17,21 @@ export function label(text,x,y) {
   const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,depthWrite:false}));
   sprite.position.set(x,y,0);sprite.scale.set(10,1.875,1);return sprite;
 }
-export function trace(group,points,color) {
-  group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),ink(color,.76)));
+function luminousStar(color,size){
+  const material=new THREE.PointsMaterial({map:starTexture,color,size,toneMapped:false,transparent:true,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  return material;
 }
 export function constellation(group,name,catalog,edges,origin,scale,main,color) {
   const [ra,dec]=catalog[0];
   const points=catalog.map(([r,d])=>vec(origin-(r-ra)*Math.cos(dec*Math.PI/180)*scale,(d-dec)*scale));
   const stars=new THREE.Points(new THREE.BufferGeometry().setFromPoints(points),
-    new THREE.PointsMaterial({color,size:.26,depthWrite:false}));
+    luminousStar(color,.36));
   stars.name=name;group.add(stars);
   const lines=edges.flatMap(([a,b])=>[points[a],points[b]]);
-  group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines),ink(color,.65)));
+  group.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(lines),ink(color,.55)));
   const beacon=new THREE.Points(new THREE.BufferGeometry().setFromPoints([points[main]]),
-    new THREE.PointsMaterial({color,size:.48,depthWrite:false}));
+    luminousStar(color,.75));
   group.add(beacon);
   return {pos:points[main],beacon};
 }
@@ -57,9 +61,57 @@ function diffraction(tint){
   sprite.scale.setScalar(6);return sprite;
 }
 
+function journalCard(sag,tint){
+  const canvas=document.createElement('canvas');canvas.width=1200;canvas.height=296;
+  const ctx=canvas.getContext('2d');
+  const wash=ctx.createLinearGradient(0,0,1100,296);
+  wash.addColorStop(0,'rgba(25,44,65,.90)');wash.addColorStop(1,'rgba(9,20,43,.83)');
+  ctx.beginPath();ctx.roundRect(5,5,1190,286,23);ctx.fillStyle=wash;ctx.fill();
+  ctx.lineWidth=2;ctx.strokeStyle='rgba(224,235,255,.35)';ctx.stroke();
+  ctx.textAlign='center';
+  function line(text,y,size,color){
+    ctx.font=size+'px "Noto Serif SC","Songti SC","SimSun",serif';
+    ctx.fillStyle=color;ctx.fillText(text,600,y,1120);
+  }
+  line(sag?'【 ♐ 射手座 · 翡翠引路星 】':'【 ♉ 金牛座 · 紫晶守望星 】',72,37,tint);
+  line(sag?'「 一隅春天 · 射手的奔赴与自由 」':'「 一隅春天 · 金牛的执着与长情 」',152,48,'#f5ead9');
+  line(sag?'“跨越数万光年的星河，奔赴一场属于我们的春天。”':'“岁月漫长，执守这方只属于我们的春日宇宙。”',232,36,'#cedbe8');
+  const map=new THREE.CanvasTexture(canvas);map.colorSpace=THREE.SRGBColorSpace;
+  const card=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,depthWrite:false,toneMapped:false}));
+  card.name='realm-journal';card.scale.set(8,8*296/1200,1);card.position.set(0,-2.8,.75);card.renderOrder=5;
+  return card;
+}
+
+function deepStarfield(){
+  const count=2000,positions=new Float32Array(count*3),colors=new Float32Array(count*3);
+  const sizes=new Float32Array(count);
+  const palette=['#fff','#d0e6ff','#ffe8bc'].map(hex=>new THREE.Color(hex));
+  for(let i=0;i<count;i++){
+    positions.set([52*Math.random()-26,40*Math.random()-20,-16-16*Math.random()],3*i);
+    const tier=i<1400?0:i<1900?1:2;
+    sizes[i]=[.12,.18,.28][tier]/.16;
+    const color=palette[Math.floor(Math.random()*palette.length)];
+    const brightness=[.38,.68,.96][tier]*(.85+.15*Math.random());
+    colors.set([color.r*brightness,color.g*brightness,color.b*brightness],3*i);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  geometry.setAttribute('starScale',new THREE.BufferAttribute(sizes,1));
+  const material=new THREE.PointsMaterial({map:starTexture,size:.16,vertexColors:true,transparent:true,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  material.onBeforeCompile=shader=>{
+    shader.vertexShader='attribute float starScale;\n'+shader.vertexShader.replace(
+      'gl_PointSize = size;', 'gl_PointSize = size * starScale;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <alphamap_fragment>',
+      '#include <alphamap_fragment>\ndiffuseColor.a *= 1.0-smoothstep(0.0,1.0,length(2.0*gl_PointCoord-1.0));');
+  };
+  const stars=new THREE.Points(geometry,material);
+  stars.name='realm-starfield';stars.renderOrder=-2;return stars;
+}
+
 export function makePortal(sag) {
-  const portal=new THREE.Group(),realm=new THREE.Group();
-  const colors=sag?['#ff9e42','#e85d75']:['#60a5fa','#ff6b3d'];
+  const portal=new THREE.Group(),realm=new THREE.Scene();
   portal.position.set(...(sag?[-18,14,-22]:[22,18,-16]));
   portal.name=sag?'sagittarius-portal':'taurus-portal';
   const tint=sag?'#10b981':'#c084fc';
@@ -70,30 +122,44 @@ export function makePortal(sag) {
   const title=label(sag?'♐ 射手座 · 翡翠星':'♉ 金牛座 · 紫晶星',0,-2.5);
   title.visible=false;title.scale.multiplyScalar(.75);
   const file=sag?'m8-lagoon':'m45-pleiades';
-  const map=new THREE.TextureLoader().load(import.meta.env.BASE_URL+'textures/constellations/'+file+'.png');
+  const map=new THREE.TextureLoader().load(publicAssetURL('textures/constellations/'+file+'.png'));
   map.colorSpace=THREE.SRGBColorSpace;
-  const veil=new THREE.Sprite(new THREE.SpriteMaterial({map,transparent:true,opacity:.55,
-    blending:THREE.AdditiveBlending,depthWrite:false}));
-  veil.name=file;veil.position.set(0,0,-5);veil.scale.setScalar(25);
+  // Sample the interior of the observation. The haze dissolves independently
+  // of the original photograph's circular alpha mask.
+  const hazeMaterial=new THREE.ShaderMaterial({
+    uniforms:{photo:{value:map},strength:{value:.4}},transparent:true,depthWrite:false,
+    blending:THREE.AdditiveBlending,
+    vertexShader:`varying vec2 st;
+      void main(){st=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+    fragmentShader:`uniform sampler2D photo;uniform float strength;varying vec2 st;
+      void main(){
+        vec2 p=st*2.-1.;
+        vec2 q=vec2(p.x,p.y+.23*sin(p.x*3.)-.12*p.x);
+        float density=exp(-4.*q.x*q.x-9.*q.y*q.y);
+        vec2 edge=1.-smoothstep(vec2(.58),vec2(1.),abs(p));
+        vec3 light=texture2D(photo,.5+.28*p).rgb;
+        gl_FragColor=vec4(light,strength*density*edge.x*edge.y);
+        #include <colorspace_fragment>
+      }`
+  });
+  const veil=new THREE.Mesh(new THREE.PlaneGeometry(1,1),hazeMaterial);
+  veil.name=file;veil.position.set(0,0,-8);veil.scale.set(64,36,1);
   portal.add(veil,halo,spikes,core,hitProxy,title);
+  realm.add(deepStarfield());
   realm.name=portal.name+'-realm';realm.position.copy(portal.position);realm.visible=false;
-  const backdrop=veil.clone();backdrop.position.z=-9;backdrop.scale.setScalar(32);realm.add(backdrop);
-  if(sag)constellation(realm,'sagittarius-teapot',archer,[[0,1],[0,2],[1,2],[1,3],[3,6],[6,5],[5,7],[7,4],[4,2],[4,6]],4,.48,5,colors[0]);
-  else constellation(realm,'taurus-hyades',bull,[[0,4],[4,2],[2,3],[3,1],[1,5],[0,6]],1,.32,0,colors[1]);
-  // Draw the centaur archer and the bull as luminous celestial atlas outlines.
-  const figure=new THREE.Group();figure.position.set(0,2.3,.4);figure.scale.setScalar(.64);
-  const strokes=sag?[
-    [[-4,-1],[-3,0],[-1,0],[0,1],[.2,2],[.8,2.5],[1.2,2.2],[1,1.5],[.8,1],[2,1.3],[3,1.4]],
-    [[1,1.4],[.2,1.6],[1,1.9],[3,1.4]],[[2.5,3],[3.3,2.2],[3.5,1.4],[3.2,.5],[2.5,-.1],[3,1.4],[2.5,3]],
-    [[1,1.5],[4.4,1.3],[4,1.6]],[[.8,1],[1,-.5],[2,-1.2],[2.5,-2],[1.5,-1.6],[.2,-1],[-2,-1],[-3,-2.3],[-3.4,-2.3],[-3,-.6],[-4,-1],[-4.5,-1.8]]
-  ]:[
-    [[-4,0],[-3,1],[-1,1.4],[.5,1.1],[1.4,1.6],[2.5,1.2],[3,.2],[2.2,-.2],[1.5,0],[.5,-.7],[-1.5,-.8],[-2.4,-1.8],[-3,-2],[-2.8,-.5],[-4,0],[-4.4,-1]],
-    [[1.4,1.6],[.4,2.1],[0,3.4],[.8,2.6],[2,2]],[[2,1.5],[3.2,2.2],[3.8,3.5],[3.6,2],[2.7,1]],
-    [[.5,-.7],[1.7,-1.2],[2.8,-1.1],[1.8,-.7]]
-  ];
-  for(const stroke of strokes)trace(figure,stroke.map(([x,y])=>vec(x,y)),colors[0]);
-  if(!sag){const eye=glow(colors[1],.9);eye.position.set(2.2,1,.1);figure.add(eye);}
-  const letter=label(sag?'一隅春天 · 射手的奔赴与自由':'一隅春天 · 金牛的执着与长情',0,-3);
-  realm.add(figure,letter);
+  const backdrop=veil.clone();backdrop.material=veil.material.clone();backdrop.material.uniforms.photo.value=map;backdrop.material.uniforms.strength.value=.35;backdrop.position.z=-12;backdrop.scale.set(54,36,1);backdrop.renderOrder=-1;realm.add(backdrop);
+  if(sag)constellation(realm,'sagittarius-teapot',archer,[[0,1],[0,2],[1,2],[1,3],[3,6],[6,5],[5,7],[7,4],[4,2],[4,6]],4,.48,5,'#e0fbf0');
+  else constellation(realm,'taurus-hyades',bull,[[0,4],[4,2],[2,3],[3,1],[1,5],[0,6]],1,.32,0,'#ffe2ba');
+  const atlas=new THREE.TextureLoader().load(publicAssetURL('textures/constellations/stellarium-'+(sag?'sagittarius':'taurus')+'.png'));
+  // Treat the monochrome engraving as a light-intensity mask.
+  const figure=new THREE.Mesh(new THREE.PlaneGeometry(5.35,5.35),new THREE.MeshBasicMaterial({
+    map:atlas,color:tint,opacity:.72,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false
+  }));
+  figure.name='stellarium-figure';figure.position.set(0,1.28,.55);
+  if(!sag){
+    const eye=glow('#ff603d',.55);
+    eye.position.set((.457-.5)*5.35,(.5-.45)*5.35,.02);figure.add(eye);
+  }
+  realm.add(figure,journalCard(sag,tint));
   return {portal,realm,hitProxy,halo,title,spikes};
 }

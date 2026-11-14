@@ -1,3 +1,4 @@
+import {inside} from './natural/land.js';
 const DATABASE='private-universe-surprises';
 const VERSION=1,STORE='surprises';
 let connection;
@@ -35,7 +36,7 @@ function fields(value){
   if(!['note','question','box'].includes(value.type))throw new Error('请选择纸条、问答或惊喜盒。');
   if(typeof value.color!=='string'||!/^#[a-fA-F0-9]{6}$/.test(value.color))throw new Error('请选择一种气球颜色。');
   const {x,z}=value.position||{};
-  if(!Number.isFinite(x)||!Number.isFinite(z)||Math.abs(x)>12||Math.abs(z)>8)throw new Error('请在花园草地里选择一个位置。');
+  if(!Number.isFinite(x)||!Number.isFinite(z)||!inside(x,z,1.002))throw new Error('请在花园草地里选择一个位置。');
   return {type:value.type,title:text(value.title,'惊喜标题',160),body:text(value.body,value.type==='question'?'问题':'想留下的话',12000,{required:true}),
     answer:text(value.answer,'答案',4000),color:value.color.toLowerCase(),identity:identity(value.identity),position:{x,z}};
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {rng,fbm} from './shared.js';
-import {ground,inside,creekX,creekWidth,waterY,RX,RZ} from './land.js';
+import {ground,inside,creekX,creekWidth,waterY,RX,RZ,TREE_SITE,BENCH_SITE,onCabinFloor} from './land.js';
 import {makeBanyan} from './banyan.js';
 import {guidingWindGust} from './falling-foliage.js';
 
@@ -24,13 +24,20 @@ export function makePlants(parent,time,{includeTree=true}={}){
       `);
   };
   const grass=new THREE.InstancedMesh(blade,grassMat,25000);
+  const onEstatePad=(x,z)=>{
+    const pdx=x-13.2,pdz=z-.8,pc=Math.cos(.24),ps=Math.sin(.24);
+    return Math.hypot(x+12,z+1.5)<1.04
+      ||(Math.abs(pdx*pc-pdz*ps)<1.02&&Math.abs(pdx*ps+pdz*pc)<.88)
+      ||Math.hypot(x-15,z+1.6)<1.02
+      ||(x>16.65&&x<19.75&&z>.65&&z<3.35);
+  };
   const shadeGrass=new THREE.Color('#4b6f40'),meadowGrass=new THREE.Color('#7b9559'),dryGrass=new THREE.Color('#8b945f');
   let gi=0;
   for(let attempt=0;attempt<100000&&gi<grass.count;attempt++){
     const x=(random()-.5)*RX*2.2,z=(random()-.5)*RZ*2.2;
-    if(!inside(x,z,.996)||Math.abs(x-creekX(z))<creekWidth(z)+.20)continue;
-    const patch=fbm(x*.57+9,z*.57),smallPatch=fbm(x*2.15+5,z*2.15-3),path=walkway(x,z),root=Math.hypot(x+4.1,z+.6);
-    const seat=Math.hypot(x-4.2,(z-1.5)*1.2);
+    if(onCabinFloor(x,z)||onEstatePad(x,z)||!inside(x,z,.996)||Math.abs(x-creekX(z))<creekWidth(z)+.20)continue;
+    const patch=fbm(x*.57+9,z*.57),smallPatch=fbm(x*2.15+5,z*2.15-3),path=walkway(x,z),root=Math.hypot(x-TREE_SITE.x,z-TREE_SITE.z);
+    const seat=Math.hypot(x-BENCH_SITE.x,(z-BENCH_SITE.z)*1.2);
     if(root<.56||seat<.63)continue;
     // Independently authored habitat rule: the local height gradient suppresses
     // tall grass on steep banks, while smooth ground supports loose clumps.
@@ -87,14 +94,14 @@ export function makePlants(parent,time,{includeTree=true}={}){
     const edge=1+.18*Math.sin(a*3+patch[0])+.12*Math.cos(a*5+patch[1]);
     const tail=random()<.12?1.75:1;
     const x=patch[0]+Math.cos(a)*r*patch[2]*edge*tail,z=patch[1]+Math.sin(a)*r*patch[3]*edge;
-    if(!inside(x,z,.94)||Math.abs(x-creekX(z))<creekWidth(z)+.42||walkway(x,z)<.42||Math.hypot(x+4.1,z+.6)<1.07)continue;
+    if(onCabinFloor(x,z)||!inside(x,z,.94)||Math.abs(x-creekX(z))<creekWidth(z)+.42||walkway(x,z)<.42||Math.hypot(x-TREE_SITE.x,z-TREE_SITE.z)<1.07||onEstatePad(x,z))continue;
     if(random()> .12+fbm(x*2.5+12,z*2.5-7)*.95||random()<r*.15)continue;
     dummy.position.set(x,ground(x,z),z);
     dummy.rotation.set((random()-.5)*.34,random()*Math.PI*2,(random()-.5)*.34);
     dummy.scale.setScalar(.50+random()*.71);dummy.updateMatrix();
     flowers.forEach(m=>m.setMatrixAt(fi,dummy.matrix));fi++;
   }
-  flowers.forEach((m,i)=>{m.count=fi;m.receiveShadow=true;m.name=['daisy-petals','daisy-centers','daisy-stems'][i];parent.add(m);});
+  flowers.forEach((m,i)=>{m.count=fi;m.receiveShadow=true;m.name=['daisy-petals','daisy-centers','daisy-stems'][i];m.userData.gardenFoliage=true;parent.add(m);});
 
   // Pale, tapered flower spikes grow in small families, rather than isolated beads.
   const spikeParts=[];
@@ -115,14 +122,14 @@ export function makePlants(parent,time,{includeTree=true}={}){
     const patch=lavPatches[Math.floor(random()*lavPatches.length)],a=random()*Math.PI*2,r=Math.sqrt(random());
     const rim=.83+.17*Math.sin(a*3+patch[0])+.14*Math.sin(a*5+patch[1]);
     const x=patch[0]+Math.cos(a)*r*patch[2]*rim,z=patch[1]+Math.sin(a)*r*patch[3]*rim;
-    if(!inside(x,z,.93)||Math.abs(x-creekX(z))<creekWidth(z)+.37||walkway(x,z)<.42)continue;
+    if(onCabinFloor(x,z)||!inside(x,z,.93)||Math.abs(x-creekX(z))<creekWidth(z)+.37||walkway(x,z)<.42||onEstatePad(x,z))continue;
     if(fbm(x*2.7+6,z*2.7+4)<.35)continue;
     dummy.position.set(x,ground(x,z),z);dummy.rotation.set((random()-.5)*.3,random()*Math.PI*2,(random()-.5)*.32);
     const s=.63+random()*.65;dummy.scale.setScalar(s);dummy.updateMatrix();
     lavender.setMatrixAt(li,dummy.matrix);sprigs.setMatrixAt(li,dummy.matrix);li++;
   }
   lavender.count=sprigs.count=li;lavender.receiveShadow=sprigs.receiveShadow=true;
-  lavender.name='lavender-meadow-patches';sprigs.name='lavender-stems';parent.add(lavender,sprigs);
+  lavender.name='lavender-meadow-patches';lavender.userData.gardenFoliage=true;sprigs.name='lavender-stems';parent.add(lavender,sprigs);
   return {...tree,grass:gi*3,grassClumps:gi,flowers:fi,lavender:li};
 }
 
@@ -152,7 +159,7 @@ function meadowTuft(){
 }
 
 function walkway(x,z){
-  const segments=[[[.35,-.28],[4.2,1.5]],[[4.2,1.5],[4.7,-2]],[[.05,-.3],[-2.5,.0]]];
+  const segments=[[[.35,-.28],[BENCH_SITE.x,BENCH_SITE.z]],[[BENCH_SITE.x,BENCH_SITE.z],[4.7,-2]],[[.05,-.3],[-3.2,2.1]]];
   let distance=Infinity;
   for(const [a,b] of segments){
     const dx=b[0]-a[0],dz=b[1]-a[1],t=THREE.MathUtils.clamp(((x-a[0])*dx+(z-a[1])*dz)/(dx*dx+dz*dz),0,1);

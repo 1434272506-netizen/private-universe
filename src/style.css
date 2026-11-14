@@ -74,3 +74,27 @@ h1{font:400 clamp(42px,5vw,76px)/1.12 var(--serif);letter-spacing:-.055em;margin
 #anniversary-card .card-stars{background:#54434c;color:#fff1ce;padding:.6rem 1rem;border:0;border-radius:1.5rem}
 @media(max-width:650px){#stargaze{bottom:calc(max(84px,11vh) + 54px)}}
 #galaxy-return{position:absolute;right:var(--edge);top:calc(var(--edge) + 52px);padding:10px 16px;border-radius:24px;background:#262936ed;color:#ffe7c2;border:1px solid #ffedce66}
+#garden-ui.in-realm > :not(#galaxy-return){display:none!important}
+#garden-ui.in-realm #galaxy-return{top:var(--edge)}
+@media(prefers-reduced-motion:no-preference){
+  #garden-ui:not(.in-realm) > :is(#atmosphere-switcher,.garden-footer,#stargaze,.top-actions){animation:realm-hud-appear .45s ease-out}
+  @keyframes realm-hud-appear{from{opacity:0}to{opacity:1}}
+}
+/* Quiet paper and moonlit glass, matching the garden's existing typography. */
+#tour-status,#telescope-gaze{position:absolute;left:50%;transform:translateX(-50%);z-index:4;color:#374236;background:rgba(255,250,235,.91);border:1px solid rgba(127,118,89,.25);box-shadow:0 5px 25px #17261926;backdrop-filter:blur(14px);font:12px var(--chinese);letter-spacing:.04em}
+#tour-status[hidden],#telescope-gaze[hidden]{display:none}
+#tour-status{top:var(--edge);display:flex;align-items:center;gap:18px;border-radius:22px;padding:10px 16px;max-width:min(540px,calc(100% - 46px));width:max-content}
+#tour-chapter{min-width:0;line-height:1.7}
+#tour-next{flex-shrink:0;border:0;border-left:1px solid #958d704d;padding:6px 0 6px 14px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+#telescope-gaze{bottom:max(150px,calc(11vh + 64px));border-radius:24px;padding:13px 22px;max-width:calc(100% - 46px);cursor:pointer}
+#tour-next:hover,#telescope-gaze:hover{color:#75552d}
+#tour-next:focus-visible,#telescope-gaze:focus-visible{outline:2px solid #9b7844;outline-offset:4px}
+#garden-ui:is([data-atmosphere='night'],[data-atmosphere='sunset']) :is(#tour-status,#telescope-gaze){background:rgba(26,37,44,.90);border-color:#eddfb74d;color:#fff1d4;box-shadow:0 5px 25px #0004}
+#help-panel{max-height:calc(100dvh - 110px);overflow-y:auto}
+@media(min-height:680px){#anniversary-card[open]{margin-top:auto;margin-bottom:max(24px,5vh)}}
+@media(max-width:760px){#tour-status{top:calc(var(--edge) + 98px);gap:10px;font-size:11px;padding:8px 12px}#telescope-gaze{width:max-content;font-size:11px}#app:has(#tour-status:not([hidden])) .caption-title{max-width:48vw}#tour-chapter{max-width:68vw}#app:is([data-view='meadow'],[data-view='swing'],[data-view='picnic'],[data-view='campfire'],[data-view='telescope']) .caption-title{max-width:48vw;display:block}}
+#app:is([data-view='meadow'],[data-view='swing'],[data-view='picnic'],[data-view='campfire'],[data-view='telescope']) #garden-ui:is([data-atmosphere='night'],[data-atmosphere='sunset']) :is(.masthead,.garden-footer,.caption-note,.footer-tools .quiet-button){color:#fff1dc;text-shadow:0 1px 7px #14271dd9}
+@media(max-width:760px){.garden-footer{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}.footer-tools{justify-content:space-between;gap:12px}.scene-caption{max-width:100%}#app .garden-footer .caption-title{max-width:100%;font-size:11px}.footer-tools .quiet-button{font-size:10px;padding-block:6px}}
+#neural-fly-panel{position:absolute;z-index:8;right:var(--edge);top:170px;width:266px;max-height:calc(100dvh - 340px);overflow:auto;background:rgba(250,247,232,.96);color:#3e4938;border:1px solid #93977a5c;border-radius:8px;padding:18px 18px 15px;box-shadow:0 8px 30px #14271d26;backdrop-filter:blur(12px);font:12px var(--chinese);pointer-events:auto}
+#neural-fly-panel h3{font-weight:400;margin:7px 0;font-size:17px}.neural-eyebrow{font-size:10px;letter-spacing:.18em;color:#777f65}.neural-reference{font:10px/1.7 var(--serif);margin:8px 0;color:#737865}.neural-behavior{font-size:12px;margin:8px 0}.neural-close{position:absolute;right:10px;top:8px;border:0;background:none;font:20px var(--serif);padding:4px}.neural-bars{display:grid;gap:6px}.neural-bars label{display:grid;grid-template-columns:1fr 75px;gap:8px;font-size:10px;align-items:center}.neural-bars meter{width:75px;height:9px;accent-color:#889553}.neural-actions{display:flex;gap:8px;margin-top:14px}.neural-actions button{border:1px solid #85937066;border-radius:4px;background:#f8f5e5;padding:7px 8px;font:11px var(--chinese)}.neural-actions button:hover{background:#e9edda}
+@media(max-width:760px){#neural-fly-panel{top:185px;left:23px;right:23px;width:auto;max-height:calc(100dvh - 380px);padding:14px 16px}.neural-reference{font-size:9px}}

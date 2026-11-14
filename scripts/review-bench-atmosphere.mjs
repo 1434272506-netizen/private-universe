@@ -14,7 +14,8 @@ try {
   await page.locator('#enter-direct').click({timeout:90000});
   await page.locator('#help-toggle').click();
   await page.locator('[data-place="bench"]').click();
-  for(const [mode,power,opacity] of [['day',3.65,0],['sunset',2.95,.25],['night',.65,.95]]){
+  // Night moonlight is .88 since the preceding estate lighting upgrade; legacy 72-point opacity stays .95.
+  for(const [mode,power,opacity] of [['day',3.65,0],['sunset',2.95,.25],['night',.88,.95]]){
     await page.locator('[data-atmo="'+mode+'"]').click();
     await page.waitForFunction(power=>window.__PU.scene.children.some(o=>o.isDirectionalLight&&o.intensity===power)&&!window.__PU.flying,power);
     const stats=await page.evaluate(()=>{

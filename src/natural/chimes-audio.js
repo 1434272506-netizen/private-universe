@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import {WATER_END} from './land.js';
+import {WATER_START,WATER_END} from './land.js';
 
 const pitches = [523.25, 587.33, 659.25, 783.99, 880, 1046.50];
 export function creekPitch(z) {
-  const step = Math.floor((z + 4.8) / (WATER_END + 4.8) * 5);
+  const step = Math.floor((z - WATER_START) / (WATER_END - WATER_START) * 5);
   return pitches[THREE.MathUtils.clamp(step, 0, 5)];
 }
 

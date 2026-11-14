@@ -1,0 +1,43 @@
+{
+  "blender": "4.5.9 LTS",
+  "triangles": {
+    "cabin-interior-furniture": 3836,
+    "cabin-interior-glow": 584
+  },
+  "totalTriangles": 4420,
+  "drawCallMeshes": 2,
+  "bounds": {
+    "min": [
+      -1.9589999914169312,
+      0.34999996423721313,
+      -1.566999912261963
+    ],
+    "max": [
+      1.9589999914169312,
+      3.6335983276367188,
+      1.6740000247955322
+    ]
+  },
+  "layout": {
+    "sofa": [
+      1.42,
+      0.377,
+      -0.02
+    ],
+    "sofaYaw": -1.5707963267948966,
+    "plant": [
+      1.78,
+      0.377,
+      0.9
+    ],
+    "plantScale": 1.15
+  },
+  "units": "metres, Three.js Y-up",
+  "bytes": 314184,
+  "groups": [
+    "cabin-interior-furniture",
+    "cabin-interior-glow"
+  ],
+  "authoringScript": "scripts/authoring/create_cabin_interior.py",
+  "license": "CC0-1.0 (Kenney Furniture/Food/Holiday/Survival kits + original architecture)"
+}

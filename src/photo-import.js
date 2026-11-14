@@ -1,10 +1,12 @@
 import * as supplied from './personal-content.js';
+import {publicAssetURL} from './public-assets.js';
 import {hasOriginalPhotoImport,importOriginalPhotos} from './local-content.js';
 
 let pendingImport;
 
 // Copy the exact JPEG bytes into the editable collection once per browser.
-// The committed import marker keeps removed photographs from reappearing.
+// Keep imported caption/date untouched; memory-display.js supplies display-only fallbacks.
+// The committed import marker keeps removed photographs from being re-imported.
 export function importProvidedPhotos(){
   if(pendingImport)return pendingImport;
   pendingImport=(async()=>{
@@ -12,7 +14,7 @@ export function importProvidedPhotos(){
     if(!batch?.photos?.length)return {imported:0,alreadyImported:true};
     if(await hasOriginalPhotoImport(batch.id))return {imported:0,alreadyImported:true};
     const records=await Promise.all(batch.photos.map(async photo=>{
-      const response=await fetch(photo.image);
+      const response=await fetch(publicAssetURL(photo.image));
       if(!response.ok)throw new Error(`${photo.alt}暂时未能导入，请重新打开页面重试。`);
       const bytes=await response.arrayBuffer();
       const digest=await crypto.subtle.digest('SHA-256',bytes);
