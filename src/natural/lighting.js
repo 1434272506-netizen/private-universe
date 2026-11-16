@@ -24,11 +24,18 @@ class GardenContactPass extends GTAOPass {
   }
 }
 
-export function makeLighting(renderer, scene, camera) {
+export function makeLighting(renderer, scene, camera, {cabin}={}) {
   const target = new THREE.WebGLRenderTarget(1, 1, {type: THREE.HalfFloatType});
   target.samples = Math.min(2, renderer.capabilities.maxSamples);
   const composer = new EffectComposer(renderer, target);
   const contact = new GardenContactPass(scene, camera, 1, 1);
+  // Contact normals/depth must follow the same plush deformation as the colour pass.
+  // Other geometry supplies the constant zero weight, so its contacts stay unchanged.
+  if(cabin?.toys){
+    contact.normalMaterial.defaultAttributeValues={pigletWeight:[0]};
+    contact.normalMaterial.onBeforeCompile=shader=>cabin.toys.decorateShader(shader);
+    contact.normalMaterial.customProgramCacheKey=()=> 'garden-contact-piglet-deformation-v1';
+  }
   contact.updateGtaoMaterial({radius: .48, thickness: .7, distanceExponent: 1.5, distanceFallOff: .8, scale: 1, samples: 8});
   contact.updatePdMaterial({radius: 5, samples: 8});
   contact.blendIntensity = .44;

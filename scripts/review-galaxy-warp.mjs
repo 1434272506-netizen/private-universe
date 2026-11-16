@@ -12,6 +12,15 @@ try {
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.goto(process.env.PREVIEW_URL||'http://127.0.0.1:5173/');
   await page.locator('#enter-direct').click({timeout:90000});
+  // Rare pooled effects (for example the 12–24s meteor) allocate their GPU
+  // buffers on first draw. Warm every authored geometry offscreen once before
+  // comparing portal visits; keep the strict no-growth checks below.
+  await page.evaluate(async()=>{
+    const {WebGLRenderTarget}=await import('/node_modules/three/build/three.module.js'),p=window.__PU,flags=[],target=new WebGLRenderTarget(2,2),previous=p.renderer.getRenderTarget();
+    p.scene.traverse(o=>{flags.push([o,o.visible,o.frustumCulled]);o.visible=true;o.frustumCulled=false;});
+    try{p.renderer.setRenderTarget(target);p.renderer.render(p.scene,p.camera);}
+    finally{for(const [o,visible,culled]of flags){o.visible=visible;o.frustumCulled=culled;}p.renderer.setRenderTarget(previous);target.dispose();}
+  });
   await page.evaluate(()=>window.__PU.frame('bench'));
   await page.locator('[data-atmo="night"]').click();
   await page.locator('#stargaze').click();
@@ -81,6 +90,7 @@ try {
       return {fps:Math.round((frames-1)*1000/(performance.now()-start)),...window.__PU.renderer.info.memory};
     });
     rates.push(stats.fps);
+    console.log('GPU realm resources',name,JSON.stringify(stats));
     if(memory.has(name)){
       assert.ok(stats.textures<=memory.get('taurus-portal').textures);
       assert.ok(stats.geometries<=memory.get('taurus-portal').geometries);

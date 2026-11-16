@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import * as personalContent from '../personal-content.js';
 import {ground} from './land.js';
+const relationshipStartDate=personalContent.relationshipStartDate||'2025-09-23';
 
-export function daysTogether(now=Date.now(),start=personalContent.relationshipStartDate) {
-  const epoch=Date.parse(start+'T00:00:00+08:00');
-  if(!Number.isFinite(epoch))throw new Error('Invalid relationship start date');
-  return Math.max(0,Math.floor((now-epoch)/86400000));
+export function daysTogether(now=Date.now(),start=relationshipStartDate) {
+  const beginning=new Date(start+'T00:00:00'),today=new Date(now);
+  if(!Number.isFinite(beginning.getTime())||!Number.isFinite(today.getTime()))throw new Error('Invalid relationship date');
+  // Count the client's calendar days; DST must not turn a day into 23/25 hours.
+  const ordinal=date=>Date.UTC(date.getFullYear(),date.getMonth(),date.getDate());
+  return Math.max(0,Math.round((ordinal(today)-ordinal(beginning))/86400000));
 }
 
 function endGrain() {
@@ -108,6 +111,25 @@ export function makeMilestone(island,{moveTo,frame,onOpen,onClose,stargaze,curre
   coreLight.position.y = 0.60;
   plaque.add(coreLight);
 
+  const inscriptionCanvas=document.createElement('canvas');inscriptionCanvas.width=1024;inscriptionCanvas.height=256;
+  const inscriptionTexture=new THREE.CanvasTexture(inscriptionCanvas);inscriptionTexture.colorSpace=THREE.SRGBColorSpace;
+  const inscription=new THREE.Mesh(new THREE.BoxGeometry(.9,.225,.022),new THREE.MeshStandardMaterial({map:inscriptionTexture,roughness:.58,metalness:.15,emissive:'#fff1dc',emissiveMap:inscriptionTexture,emissiveIntensity:.28}));
+  inscription.name='anniversary-live-inscription';inscription.position.set(0,.16,.38);inscription.rotation.x=-.45;plaque.add(inscription);
+  let displayedDays=-1,nextRefresh=0;
+  const dateLabel=relationshipStartDate.replaceAll('-','.');
+  const sentence=()=>`从 ${dateLabel} 至今，我们已经携手走过了整整 ${daysTogether()} 天`;
+  function update(){
+    if(Date.now()<nextRefresh)return;nextRefresh=Date.now()+60000;
+    const days=daysTogether();if(days===displayedDays)return;displayedDays=days;
+    const ctx=inscriptionCanvas.getContext('2d');ctx.fillStyle='#463729';ctx.fillRect(0,0,1024,256);
+    ctx.strokeStyle='#b89a65';ctx.lineWidth=6;ctx.strokeRect(10,10,1004,236);
+    ctx.textAlign='center';ctx.fillStyle='#fff1dc';ctx.font='34px "Microsoft YaHei", sans-serif';
+    ctx.fillText(`从 ${dateLabel} 至今`,512,65);ctx.fillText('我们已经携手走过了',512,125);
+    ctx.font='bold 46px "Microsoft YaHei", sans-serif';ctx.fillText(`整整 ${days} 天`,512,203);
+    plaque.userData.daysTogether=days;inscription.userData.text=sentence();inscriptionTexture.needsUpdate=true;
+  }
+  update();
+
   const patioRing=new THREE.Mesh(new THREE.CylinderGeometry(.56,.62,.035,24),stoneMat);
   patioRing.name='patioRing';patioRing.position.y=.0175;patioRing.receiveShadow=true;
   plaque.add(patioRing);
@@ -135,7 +157,7 @@ export function makeMilestone(island,{moveTo,frame,onOpen,onClose,stargaze,curre
     timer=setInterval(refresh,60000);
   }
   function refresh(){
-    card.querySelector('h2').textContent='与你相恋的第 '+daysTogether()+' 天';
+    update();card.querySelector('h2').textContent=sentence();
   }
   card.addEventListener('close',()=>{
     clearInterval(timer);onClose();
@@ -144,5 +166,5 @@ export function makeMilestone(island,{moveTo,frame,onOpen,onClose,stargaze,curre
   });
   card.querySelector('.card-close').onclick=()=>card.close();
   card.querySelector('.card-stars').onclick=()=>{goToStars=true;card.close();};
-  return {plaque,open};
+  return {plaque,open,update};
 }

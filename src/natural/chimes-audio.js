@@ -76,5 +76,12 @@ export function makeCreekChimes(scene, audio) {
     }
     attribute.needsUpdate = true;
   }
-  return {strike, update};
+  function porchStrike(){
+    void audio.chimeOutput().then(output=>{
+      if(!output)return;
+      soundVoice(output.context,output.bus,880,output.volume*.8);
+      soundVoice(output.context,output.bus,1318.51,output.volume*.32);
+    }).catch(()=>{});
+  }
+  return {strike,update,porchStrike};
 }

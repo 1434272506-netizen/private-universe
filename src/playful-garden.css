@@ -1,0 +1,14 @@
+#launch-fireworks{position:absolute;right:var(--edge);top:86px;display:flex;align-items:center;gap:8px;padding:10px 15px;border:1px solid #d8ccb077;border-radius:22px;background:#1b2935e8;color:#fff1dc;box-shadow:0 5px 24px #0002;backdrop-filter:blur(12px);font:12px var(--chinese);letter-spacing:.06em;cursor:pointer}
+#launch-fireworks[hidden]{display:none!important}
+#launch-fireworks span{color:#c9aed9;font-size:19px;line-height:1}
+#launch-fireworks:hover{background:#35413ee8;border-color:#aeceb4}
+#launch-fireworks:focus-visible{outline:2px solid #ceb3de;outline-offset:4px}
+#cabin-journal-dialog{width:min(420px,calc(100vw - 40px));max-height:calc(100dvh - 60px);padding:0;border:1px solid #bfa27888;border-radius:7px;background:#f9f1df;color:#584638;box-shadow:0 20px 80px #101b2444;overflow:auto}
+#cabin-journal-dialog::backdrop{background:#1c243653;backdrop-filter:blur(4px)}
+.cabin-journal-paper{position:relative;padding:48px 35px 35px;background:repeating-linear-gradient(0deg,transparent 0 30px,#b5a17a16 30px 31px)}
+.journal-close{position:absolute;right:14px;top:10px;width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:inherit;font:25px Georgia;cursor:pointer}
+.journal-eyebrow{font:9px var(--sans);letter-spacing:.24em;color:#8d7799}
+.cabin-journal-paper h2{font:24px var(--chinese);margin:17px 0 25px}
+.cabin-journal-paper p{font:16px/2 var(--chinese);margin:0 0 34px}
+.journal-signature{display:block;text-align:right;font:12px var(--chinese);color:#68785b}
+@media(max-width:760px){#launch-fireworks{top:76px;padding:9px 12px;font-size:11px}.cabin-journal-paper{padding:44px 26px 30px}}

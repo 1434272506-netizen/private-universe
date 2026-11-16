@@ -6,6 +6,81 @@ import {material} from './materials.js';
 import {rng} from './shared.js';
 import {ground,CABIN_SITE} from './land.js';
 import {publicAssetURL} from '../public-assets.js';
+import {makeCabinArtistry} from './cabin-artistry.js';
+import {makeCabinPlayfulness} from './cabin-playfulness.js';
+
+function makeHearthFire(){
+ const group=new THREE.Group();group.name='cabin-hearth-fire';group.position.set(-.95,.78,-.65);group.rotation.y=.44;group.visible=false;
+ // The existing angled firebox is farther back than the requested rig origin.
+ // Align its emitter with the GLB ember bed instead of burning through the front pier.
+ const emitter=new THREE.Group();emitter.name='cabin-firebox-emitter';
+ emitter.position.set(-1.35+Math.sin(.44)*.12,.78,-1+Math.cos(.44)*.12).sub(group.position).applyAxisAngle(new THREE.Vector3(0,1,0),-.44);emitter.position.y=-.045;group.add(emitter);
+ const clock={value:0},gain={value:1};
+ const flameVertex=`
+  uniform float uTime; attribute float aPhase; varying vec2 vUv; varying float vPhase;
+  void main(){
+   vUv=uv;vPhase=aPhase;vec3 p=position;
+   float hop=1.0+.07*sin(uTime*8.5+aPhase)+.035*cos(uTime*6.2+aPhase*1.7);
+   p.y*=hop;
+   p.x+=uv.y*uv.y*(.014*sin(uTime*8.5+aPhase+uv.y*3.0)+.008*cos(uTime*6.2+aPhase));
+   gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.0);
+  }`;
+ const flameFragment=`
+  uniform float uTime;uniform vec3 uColor;uniform float uOpacity;uniform float uGain;
+  varying vec2 vUv;varying float vPhase;
+  void main(){
+   float y=vUv.y;
+   float bend=.12*sin(uTime*4.2+vPhase+y*4.0)*y*y;
+   float width=.44*pow(max(0.0,1.0-y),.68)*(.68+.32*sin(y*3.14159));
+   float edge=1.0-smoothstep(max(0.0,width-.075),width+.015,abs(vUv.x-.5-bend));
+   float alpha=edge*smoothstep(0.0,.075,y)*(1.0-smoothstep(.86,1.0,y))*uOpacity;
+   if(alpha<.003)discard;
+   gl_FragColor=vec4(uColor*uGain,alpha);
+   #include <tonemapping_fragment>
+   #include <colorspace_fragment>
+  }`;
+ const layers=[];
+ for(const [index,color,scale,opacity] of [[0,'#ff5a18',1,.82],[1,'#ffb830',.73,.88],[2,'#fff7c2',.43,.94]]){
+  const geometries=[];
+  for(let i=0;i<3;i++)for(const cross of [false,true]){
+   const h=[.33,.44,.36][i]*scale,w=[.19,.25,.18][i]*scale;
+   const geometry=new THREE.PlaneGeometry(w,h,4,10);geometry.translate(0,h/2,0);
+   if(cross)geometry.rotateY(Math.PI/2);
+   geometry.translate((i-1)*.09*scale,0,index*.008);
+   geometry.setAttribute('aPhase',new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count).fill(i*1.9+index*.7),1));geometries.push(geometry);
+  }
+  const geometry=mergeGeometries(geometries);geometries.forEach(g=>g.dispose());
+  const mat=new THREE.ShaderMaterial({uniforms:{uTime:clock,uColor:{value:new THREE.Color(color)},uOpacity:{value:opacity},uGain:gain},vertexShader:flameVertex,fragmentShader:flameFragment,transparent:true,side:THREE.DoubleSide,depthWrite:false,forceSinglePass:true});
+  const layer=new THREE.Mesh(geometry,mat);layer.name=['cabin-flame-outer','cabin-flame-gold','cabin-flame-core'][index];layer.userData.gardenFoliage=true;layer.renderOrder=20+index;layer.frustumCulled=false;emitter.add(layer);layers.push(layer);
+ }
+ const count=15,positions=new Float32Array(count*3),lives=new Float32Array(count),geometry=new THREE.BufferGeometry();
+ geometry.setAttribute('position',new THREE.BufferAttribute(positions,3).setUsage(THREE.DynamicDrawUsage));
+ geometry.setAttribute('aLife',new THREE.BufferAttribute(lives,1).setUsage(THREE.DynamicDrawUsage));
+ const sparks=new THREE.Points(geometry,new THREE.ShaderMaterial({
+  uniforms:{uHeight:{value:800}},transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+  vertexShader:`attribute float aLife;uniform float uHeight;varying float vLife;void main(){vLife=aLife;vec4 view=modelViewMatrix*vec4(position,1.0);gl_Position=projectionMatrix*view;gl_PointSize=clamp(.007*uHeight*projectionMatrix[1][1]/max(.1,-view.z),1.2,5.0);}`,
+  fragmentShader:`varying float vLife;void main(){
+   float r=length(gl_PointCoord-.5)*2.0;float alpha=(1.0-smoothstep(.15,1.0,r))*vLife;
+   if(alpha<.005)discard;gl_FragColor=vec4(1.0,.48,.10,alpha);
+   #include <tonemapping_fragment>
+   #include <colorspace_fragment>
+  }`
+ }));
+ sparks.name='cabin-hearth-embers';sparks.frustumCulled=false;sparks.renderOrder=23;emitter.add(sparks);
+ const viewport=new THREE.Vector2();sparks.onBeforeRender=renderer=>{renderer.getDrawingBufferSize(viewport);sparks.material.uniforms.uHeight.value=viewport.y;};
+ group.userData.sparkCount=count;group.userData.layerColors=['#ff5a18','#ffb830','#fff7c2'];
+ function update(t){
+  clock.value=t;
+  for(let i=0;i<count;i++){
+   const age=(t*.31+i/count)%1,theta=t*1.4+i*2.39996,r=.075*(1-age)+.01;
+   positions.set([Math.cos(theta)*r, .045+age*.82, Math.sin(theta)*r-.035*age],i*3);
+   lives[i]=Math.sin(age*Math.PI)*(1-smoothFade(.62,1,age));
+  }
+  geometry.attributes.position.needsUpdate=true;geometry.attributes.aLife.needsUpdate=true;
+ }
+ const smoothFade=(a,b,v)=>{const x=THREE.MathUtils.clamp((v-a)/(b-a),0,1);return x*x*(3-2*x);};
+ return {group,update,setWarmth:amount=>{gain.value=.9+.25*amount;}};
+}
 
 function engravedSign(){
  const c=document.createElement('canvas');c.width=1024;c.height=192;
@@ -13,13 +88,21 @@ function engravedSign(){
  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='italic 48px Georgia';
  ctx.fillStyle='#16130f';ctx.fillText('Our Secret Haven',514,70);ctx.fillStyle='#dbbd87';ctx.fillText('Our Secret Haven',512,68);
  ctx.font='24px Georgia';ctx.fillStyle='#ba9d70';ctx.fillText('·  2025.09.23  ·',512,137);
+ ctx.strokeStyle='#bca16b';ctx.lineWidth=1.5;
+ for(const side of [-1,1])for(const row of [35,158]){ctx.beginPath();ctx.moveTo(512+side*420,row);ctx.bezierCurveTo(512+side*370,row-26,512+side*350,row+20,512+side*315,row);ctx.stroke();}
  const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;map.anisotropy=4;
- return new THREE.MeshStandardMaterial({map,roughness:.8});
+ return new THREE.MeshStandardMaterial({map,roughness:.8,emissive:'#ffe3ac',emissiveMap:map,emissiveIntensity:.04});
 }
 function grainMap(){
  const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');
  ctx.fillStyle='#a37a51';ctx.fillRect(0,0,128,128);
  for(let r=5;r<90;r+=6){ctx.beginPath();for(let i=0;i<=96;i++){const a=i*Math.PI/48,radius=r*(1+.04*Math.sin(a*5+r));const x=62+Math.cos(a)*radius,y=66+Math.sin(a)*radius;if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);}ctx.strokeStyle='#5e432c';ctx.lineWidth=1.4;ctx.stroke();}
+ const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;return map;
+}
+function ivoryGrain(){
+ const c=document.createElement('canvas');c.width=c.height=128;const ctx=c.getContext('2d');ctx.fillStyle='#fffdf8';ctx.fillRect(0,0,128,128);
+ ctx.strokeStyle='#8d78600b';ctx.lineWidth=1;
+ for(let k=0;k<30;k++){ctx.beginPath();for(let j=0;j<=16;j++){const x=k*4.5+Math.sin(j*.8+k)*.6,y=j*8;if(j)ctx.lineTo(x,y);else ctx.moveTo(x,y);}ctx.stroke();}
  const map=new THREE.CanvasTexture(c);map.colorSpace=THREE.SRGBColorSpace;return map;
 }
 // Linear-space tangent normals: reflection shifts gently as the viewing angle changes.
@@ -33,8 +116,12 @@ function glassWaveNormalMap(frosted=false){
  ctx.putImageData(image,0,0);const map=new THREE.CanvasTexture(c);map.wrapS=map.wrapT=THREE.RepeatWrapping;return map;
 }
 export function makeCabin(){
- const group=new THREE.Group();group.name='secret-haven-cabin';
+ const group=new THREE.Group();group.name='secret-haven-cabin';group.userData.interaction='cabin';
+ // Invisible, low-cost picking volumes are explicitly raycast, never rendered.
+ const hitTarget=new THREE.Mesh(new THREE.BoxGeometry(4.5,4,3.6),new THREE.MeshBasicMaterial());
+ hitTarget.name='cabin-visit-hit-area';hitTarget.position.y=2.1;hitTarget.visible=false;hitTarget.userData.interaction='cabin';group.add(hitTarget);
  const wood=material('wood'),stone=material('rock');
+ const ivoryMap=ivoryGrain(),ivoryWood=new THREE.MeshStandardMaterial({map:ivoryMap,bumpMap:ivoryMap,bumpScale:.004,roughness:.78});
  const paint=new THREE.MeshStandardMaterial({roughness:.86});
  const bronze=new THREE.MeshStandardMaterial({roughness:.42,metalness:.7});
  const iron=new THREE.MeshStandardMaterial({roughness:.64,metalness:.55});
@@ -53,21 +140,24 @@ export function makeCabin(){
   };
   mat.customProgramCacheKey=()=> 'cabin-physical-sky-exposure-v1';
  }
- const dayInteriorBounce=new THREE.Color('#fff2de'),nightHearthBounce=new THREE.Color('#ffb56e');
+ // Neutral moonlit fill keeps green/lavender fabric distinct beside the amber hearth.
+ const dayInteriorBounce=new THREE.Color('#fff2de'),nightWindowBounce=new THREE.Color('#e4ebf2');
  const interiorFurnitureMat=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,emissive:'#fff2de',emissiveIntensity:.13,roughness:.78,metalness:.04,envMapIntensity:.55});
  const interiorGlowMat=new THREE.MeshStandardMaterial({color:'#ffffff',vertexColors:true,emissive:'#ffffff',emissiveIntensity:.18,roughness:.42,metalness:0});
+ const toys=makeCabinPlayfulness(group);
  // glTF stores RGBA vertex colours. Tint both reflected and emitted light with
  // the baked furniture/AO/fire colours, including Three's USE_COLOR_ALPHA path.
  for(const [index,mat] of [interiorFurnitureMat,interiorGlowMat].entries()){
-  mat.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n#if defined(USE_COLOR_ALPHA) || defined(USE_COLOR)\n totalEmissiveRadiance *= vColor.rgb;\n#endif');};
-  mat.customProgramCacheKey=()=>`cabin-interior-vertex-emission-v1-${index}`;
+  mat.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n#if defined(USE_COLOR_ALPHA) || defined(USE_COLOR)\n totalEmissiveRadiance *= vColor.rgb;\n#endif');if(index===0)toys.decorateShader(shader);};
+  mat.customProgramCacheKey=()=>`cabin-interior-vertex-emission-piglet-v2-${index}`;
  }
  const bulbs=new THREE.MeshStandardMaterial({emissive:'#ffa143',roughness:.42});
  const endGrain=new THREE.MeshStandardMaterial({map:grainMap(),roughness:.93});
- const batches=new Map(),doorFallback=new Map(),hangingFallback=new Map(),walls=[],random=rng(923),walnut='#60412e',honey='#bc8b61',trim='#d9b180';
+ const batches=new Map(),doorFallback=new Map(),hangingFallback=new Map(),walls=[],random=rng(923),walnut='#60412e',honey='#8a5a36',trim='#d9b180',ivory='#f4ede2';
  let activeBatches=batches;
  const fixtures={windowPanes:0,supports:[],steps:[],deck:{y:.34,front:3.6},windowCount:4};
  function part(mat,color,g,x,y,z,rx=0,ry=0,rz=0){
+  if(mat===wood&&(color===ivory||color==='#e8dccb'))mat=ivoryWood;
   if(g.index){const flat=g.toNonIndexed();g.dispose();g=flat;}
   g.rotateX(rx);g.rotateY(ry);g.rotateZ(rz);g.translate(x,y,z);
   const tint=new THREE.Color(color),colors=new Float32Array(g.attributes.position.count*3);
@@ -77,11 +167,18 @@ export function makeCabin(){
  function box(mat,color,x,y,z,w,h,d,rz=0){part(mat,color,new THREE.BoxGeometry(w,h,d),x,y,z,0,0,rz);}
  function rounded(mat,color,x,y,z,w,h,d,r=.012){part(mat,color,new RoundedBoxGeometry(w,h,d,2,r),x,y,z);}
  function cylinder(mat,color,x,y,z,r,h,rx=0,rz=0){part(mat,color,new THREE.CylinderGeometry(r*.96,r,h,12),x,y,z,rx,0,rz);}
+ function shingle(color,x,y,z,w,h,d,rz){
+  const c=.009,shape=new THREE.Shape(),pts=[[-w/2+c,-d/2],[w/2-c,-d/2],[w/2,-d/2+c],[w/2,d/2-c],[w/2-c,d/2],[-w/2+c,d/2],[-w/2,d/2-c],[-w/2,-d/2+c]];
+  shape.moveTo(...pts[0]);for(const p of pts.slice(1))shape.lineTo(...p);shape.closePath();
+  const g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});g.rotateX(-Math.PI/2);g.translate(0,-h/2,0);part(wood,color,g,x,y,z,0,0,rz);
+ }
  function beam(mat,color,a,b,r=.035){
   const av=new THREE.Vector3(...a),bv=new THREE.Vector3(...b),d=bv.clone().sub(av),mid=av.clone().add(bv).multiplyScalar(.5);
   const g=new THREE.CylinderGeometry(r,r,d.length(),10);g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize()));part(mat,color,g,mid.x,mid.y,mid.z);
  }
  function localGround(x,z){const c=Math.cos(CABIN_SITE.yaw),s=Math.sin(CABIN_SITE.yaw);return ground(CABIN_SITE.x+x*c+z*s,CABIN_SITE.z-x*s+z*c)-ground(CABIN_SITE.x,CABIN_SITE.z);}
+ const artistry=makeCabinArtistry({part,box,rounded,cylinder,beam,wood,paint,bronze,iron,frostedGlass,bulbs,group});
+ fixtures.artistry=artistry.stats;
  function foot(x,z,top,width=.19){
   const bottom=localGround(x,z)-.035;
   box(wood,walnut,x,(bottom+top)/2,z,width,top-bottom,width);
@@ -116,9 +213,9 @@ export function makeCabin(){
   for(let row=0;row<8;row++)for(let tile=0;tile<12;tile++){
    const across=2.53-row*.326,a=Math.max(-2.16,-2.16+(tile-.5*(row%2))*.40),b=Math.min(2.16,-2.16+(tile+1-.5*(row%2))*.40);
    if(b<=a)continue;const shade=new THREE.Color().setHSL(.071+random()*.015,.20+random()*.12,.23+random()*.14);
-   box(wood,shade,side*across,3.90-slope*across,(a+b)/2,.47,.076,b-a-.009,-side*angle);
+   shingle(shade,side*across,3.90-slope*across,(a+b)/2,.47,.076,b-a-.009,-side*angle);
   }
-  for(const z of [-2.17,2.17])box(wood,trim,x,3.78-slope*Math.abs(x),z,3.04,.14,.12,-side*angle);
+  for(const z of [-2.17,2.17])box(wood,ivory,x,3.78-slope*Math.abs(x),z,3.04,.14,.12,-side*angle);
  }
  box(bronze,'#73513a',0,3.966,0,.19,.13,4.43);
  // King post, tie beam and diagonal braces on both exposed gables.
@@ -142,14 +239,16 @@ export function makeCabin(){
  // Tall porch posts and a shallow, shingled door canopy, inside the existing eave envelope.
  for(const side of [-1,1]){
   foot(side*.74,2.45,.21,.13);box(wood,walnut,side*.74,1.325,2.45,.13,2.25,.13);
-  beam(wood,honey,[side*.74,2.02,2.45],[side*.32,2.49,2.45],.04);
-  beam(wood,honey,[side*.74,2.10,2.45],[side*.74,2.48,2.02],.04);
+  beam(wood,ivory,[side*.74,2.02,2.45],[side*.32,2.49,2.45],.04);
+  beam(wood,'#e8dccb',[side*.74,2.10,2.45],[side*.74,2.48,2.02],.04);
  }
  box(wood,walnut,0,2.49,2.26,1.82,.12,.68);
  for(let i=0;i<9;i++)box(wood,i%2?walnut:honey,(i-4)*.205,2.57,2.28,.20,.07,.76);
  box(bronze,'#786043',0,2.55,2.68,1.9,.08,.045);
  // Framed plank door, small frosted light and Z braces.
  rounded(wood,walnut,0,1.23,1.865,1.1,1.89,.14);
+ for(const x of [-.565,.565])rounded(wood,ivory,x,1.27,1.975,.065,1.94,.07,.012);
+ rounded(wood,'#e8dccb',0,2.22,1.975,1.20,.075,.07,.012);
  for(let i=-3;i<=3;i++)box(wood,i%2?honey:'#aa7952',i*.133,1.22,1.953,.127,1.73,.045);
  for(const y of [.55,1.55])box(wood,walnut,0,y,1.992,.84,.072,.045);
  beam(wood,walnut,[-.37,.59,2.015],[.37,1.52,2.015],.031);
@@ -165,7 +264,9 @@ export function makeCabin(){
   function panel(mat,color,u,v,depth,w,h,d,rot=0){const g=new THREE.BoxGeometry(w,h,d);g.rotateZ(rot);part(mat,color,g,x+u*Math.cos(yaw)+depth*Math.sin(yaw),1.52+v,z-u*Math.sin(yaw)+depth*Math.cos(yaw),0,yaw);}
   for(const u of [-.52,.52])panel(wood,walnut,u,0,.015,.09,1.14,.20);
   for(const v of [-.55,.55])panel(wood,walnut,0,v,.015,1.13,.10,.20);
-  for(const side of [-1,1])for(let k=0;k<3;k++)panel(paint,k%2?'#d3bd94':'#a99273',side*(.38+k*.024),0,-.04,.035,.91,.045);
+  for(const side of [-1,1])panel(wood,ivory,side*.51,0,.128,.035,1.12,.025);
+  for(const v of [-.52,.52])panel(wood,'#e8dccb',0,v,.128,1.04,.035,.025);
+  artistry.curtain(x,z,yaw);
   // Four physical panes per window, separated by the existing cross-shaped timber mullions.
   for(const u of [-.24,.24])for(const v of [-.258,.258]){
    panel(glass,'#ffffff',u,v,.07,.429,.464,.012);fixtures.windowPanes++;
@@ -178,24 +279,15 @@ export function makeCabin(){
   for(const u of [-.46,.46])panel(wood,'#674a34',u,0,-.10,.028,1.01,.32);
   panel(wood,'#674a34',0,.49,-.10,.94,.032,.32);
   panel(wood,'#674a34',0,-.505,-.10,.94,.032,.32);
-  panel(wood,trim,0,0,.108,.047,1.0,.05);panel(wood,trim,0,0,.108,.97,.045,.05);
-  panel(wood,trim,0,-.6,.03,1.22,.12,.30);
+  panel(wood,ivory,0,0,.108,.047,1.0,.05);panel(wood,ivory,0,0,.108,.97,.045,.05);
+  panel(wood,'#e8dccb',0,-.6,.03,1.22,.12,.30);
   for(const side of [-1,1]){
    panel(wood,walnut,side*.68,0,.01,.23,1.07,.065);
    for(let k=0;k<8;k++)panel(wood,k%2?honey:'#916946',side*.68,-.44+k*.125,.053,.21,.065,.08,.10);
   }
   // Slim sill planter with individual flower petals and slender leaves.
   panel(wood,walnut,0,-.70,.16,1.03,.16,.22);
-  for(let i=0;i<7;i++){
-   const u=(i-3)*.127,depth=.18,fx=x+u*Math.cos(yaw)+depth*Math.sin(yaw),fz=z-u*Math.sin(yaw)+depth*Math.cos(yaw);
-   flower(fx,.99+(i%2)*.025,fz,i%2?'#eac19b':'#d1b8c7',.026);
-  }
- }
- function flower(x,y,z,petalColor,r=.035){
-  cylinder(paint,'#426441',x,y-.08,z,.007,.16);
-  for(let k=0;k<7;k++){const a=k*Math.PI*2/7,g=new THREE.SphereGeometry(r,7,5);g.scale(.65,.32,1.1);g.rotateY(a);part(paint,petalColor,g,x+Math.sin(a)*r*.75,y,z+Math.cos(a)*r*.75);}
-  part(paint,'#d8ac49',new THREE.SphereGeometry(r*.35,8,5),x,y+.008,z);
-  for(const side of [-1,1]){const leaf=new THREE.SphereGeometry(r*.7,7,4);leaf.scale(.38,.22,1.6);part(paint,'#476a46',leaf,x+side*r*.6,y-.08,z,0,side*.7,side*.45);}
+  artistry.sill(x,z,yaw);
  }
  for(const side of [-1,1]){windowFrame(side*1.36,1.89,0);windowFrame(side*2.27,.1,side*Math.PI/2);}
  rounded(wood,'#3c2c23',0,2.295,1.966,1.91,.37,.09,.025);
@@ -217,7 +309,7 @@ export function makeCabin(){
   for(const dx of [-.45,.45])box(wood,walnut,cx+dx,.52,cz,.045,.35,.48);
   for(const y of [.41,.64]){for(const dz of [-.255,.255])box(bronze,'#81643f',cx,y,cz+dz,.94,.025,.02);for(const dx of [-.47,.47])box(bronze,'#81643f',cx+dx,y,cz,.02,.025,.51);}
   box(paint,'#343a28',cx,.681,cz,.84,.025,.40);
-  for(let i=0;i<18;i++){const x=cx+(random()-.5)*.74,z=cz+(random()-.5)*.32;flower(x,.83+random()*.13,z,['#d6a7b4','#efd8a9','#c9b4d5'][i%3],.035+random()*.008);}
+  artistry.porchGarden(cx,cz);
   for(let i=0;i<4;i++){
    const x=cx-.34+i*.22,pts=[new THREE.Vector3(x,.72,cz+.27),new THREE.Vector3(x+.07,.55,cz+.31),new THREE.Vector3(x-.03,.35,cz+.29)];
    part(paint,'#365338',new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),10,.008,5,false),0,0,0);
@@ -237,6 +329,9 @@ export function makeCabin(){
  beam(iron,'#33392f',[-.74,2.42,2.45],[-.88,2.23,2.47],.008);
  // A tiny brass chime moves only with updateSmoke's scene time (frozen in reduced motion).
  const chime=new THREE.Group();chime.name='porch-brass-wind-chime';chime.position.set(.89,2.36,2.46);group.add(chime);
+ chime.userData.interaction='cabin-chime';
+ const chimeTarget=new THREE.Mesh(new THREE.SphereGeometry(.17,8,6),hitTarget.material);
+ chimeTarget.name='porch-chime-touch-target';chimeTarget.position.y=-.10;chimeTarget.visible=false;chimeTarget.userData.interaction='cabin-chime';chime.add(chimeTarget);
  beam(iron,'#4c4937',[.89,2.48,2.46],[.89,2.385,2.46],.0025);
  const chimeTop=new THREE.Mesh(new THREE.ConeGeometry(.066,.07,10),new THREE.MeshStandardMaterial({color:'#a98a54',metalness:.75,roughness:.4}));chime.add(chimeTop);
  for(let i=0;i<4;i++){
@@ -245,11 +340,7 @@ export function makeCabin(){
   const top=-.12+(.15+i*.018)/2,thread=new THREE.Mesh(new THREE.CylinderGeometry(.0015,.0015,-.005-top,5),chimeTop.material);
   thread.position.set(x,(top-.005)/2,z);chime.add(thread);
  }
- // A small tea table sits to the side of the clear approach to the door.
- cylinder(wood,honey,-1.34,.68,2.48,.31,.065);
- for(const dx of [-.19,.19])for(const dz of [-.14,.14])box(wood,walnut,-1.34+dx,.49,2.48+dz,.045,.34,.045);
- for(const dx of [-.13,.13]){cylinder(paint,'#c0b39b',-1.34+dx,.758,2.48,.047,.09);cylinder(paint,'#7a4e29',-1.34+dx,.804,2.48,.038,.008);part(paint,'#c0b39b',new THREE.TorusGeometry(.028,.006,7,16),-1.34+dx+.051,.759,2.48,0,Math.PI/2);}
- cylinder(frostedGlass,'#ffffff',-1.34,.76,2.65,.035,.082);cylinder(bulbs,'#edc387',-1.34,.79,2.65,.011,.023);
+ // Rocker, wool throw, tea service and cookies are batched by artistry above.
  for(let row=0;row<2;row++)for(let j=0;j<4-row;j++){part(wood,'#705039',new THREE.CylinderGeometry(.055,.068,.39,10),1.13+j*.14,.40+row*.11,2.10,Math.PI/2);}
  // Stone chimney, sloping metal flashing and a covered, recessed flue.
  for(let i=0;i<9;i++)for(let j=0;j<2;j++){const offset=(j-.5)*.36,alongX=i%2===0;box(stone,i%3===0?'#9b9187':'#b4afa0',-1.55+(alongX?offset:0),2.28+i*.245,-.90+(alongX?0:offset),alongX?.35:.73,.238,alongX?.73:.35);}
@@ -258,8 +349,10 @@ export function makeCabin(){
  for(const dx of [-.32,.32])for(const dz of [-.32,.32])box(stone,'#929185',-1.55+dx,4.535,-.9+dz,.12,.24,.12);
  rounded(stone,'#777c70',-1.55,4.69,-.9,1.0,.13,1.0,.025);
  const names=new Map([[wood,'cabin-crafted-timber'],[stone,'cabin-stonework'],[paint,'cabin-flowers-and-interior-detail'],[bronze,'cabin-bronze-trim'],[iron,'cabin-iron-and-cables'],[glass,'cabin-recessed-window-glass'],[frostedGlass,'cabin-frosted-and-lantern-glass'],[bulbs,'cabin-bulbs-and-lamps'],[endGrain,'cabin-log-end-grain']]);
+ names.set(ivoryWood,'cabin-ivory-painted-trim');
+ for(const [mat,name] of artistry.materials)names.set(mat,name);
  const structureMaterials=new Set([wood,stone,endGrain]);
- for(const [mat,parts] of batches){mat.vertexColors=true;const merged=mergeGeometries(parts);if(!merged)throw new Error('Cabin material batch could not merge');for(const g of parts)g.dispose();const mesh=new THREE.Mesh(merged,mat);mesh.name=names.get(mat);if(mat===paint)mesh.userData.gardenFoliage=true;mesh.castShadow=mat!==glass&&mat!==frostedGlass&&mat!==bulbs;mesh.receiveShadow=true;group.add(mesh);if(structureMaterials.has(mat))walls.push(mesh);}
+ for(const [mat,parts] of batches){mat.vertexColors=true;const merged=mergeGeometries(parts);if(!merged)throw new Error('Cabin material batch could not merge');for(const g of parts)g.dispose();const mesh=new THREE.Mesh(merged,mat);mesh.name=names.get(mat);if(mat===paint||mat===artistry.materials[0][0])mesh.userData.gardenFoliage=true;mesh.castShadow=mat!==glass&&mat!==frostedGlass&&mat!==bulbs&&!mat.transparent;mesh.receiveShadow=true;group.add(mesh);if(structureMaterials.has(mat))walls.push(mesh);}
  function fallbackMesh(parts,name){
   const root=new THREE.Group();root.name=name;group.add(root);
   for(const [mat,list] of parts){mat.vertexColors=true;const mesh=new THREE.Mesh(mergeGeometries(list),mat);for(const g of list)g.dispose();mesh.castShadow=mat!==frostedGlass&&mat!==bulbs;mesh.receiveShadow=true;root.add(mesh);}
@@ -275,18 +368,27 @@ export function makeCabin(){
  const lanternGlows=[];
  for(const position of lanternCenters){const sprite=new THREE.Sprite(lanternGlowMat);sprite.name='cabin-lantern-soft-glow';sprite.position.set(...position);sprite.scale.setScalar(.63);sprite.visible=false;group.add(sprite);lanternGlows.push(sprite);}
  const smoke=Array.from({length:8},()=>{const p=new THREE.Sprite(new THREE.SpriteMaterial({map,color:'#c7c4b9',transparent:true,depthWrite:false}));p.name='cabin-hearth-smoke';group.add(p);return p;});
- let warmth=0;
+ artistry.addEffects(map,cablePoints.map(p=>p.clone().add(new THREE.Vector3(0,-.069,0))));
+ const hearthFire=makeHearthFire();group.add(hearthFire.group);
+ let warmth=0,chimeTime=-Infinity;
+ function ringChime(t){chimeTime=t;chime.userData.strikeCount=(chime.userData.strikeCount||0)+1;}
  function updateSmoke(t){
+  artistry.update(t,warmth);
   bulbs.emissiveIntensity=(.035+1.6*warmth)*(1+.025*Math.sin(t*1.7));
-  interiorGlowMat.emissiveIntensity=(.18+1.55*warmth)*(1+.018*warmth*Math.sin(t*2.3));
+  interiorGlowMat.emissiveIntensity=(.18+1.55*warmth)*(1+.05*Math.sin(t*7.3)+.025*Math.sin(t*19.1));
+  interiorFurnitureMat.emissiveIntensity=(.13+.13*warmth)*(1+warmth*(.012*Math.sin(t*7.3)+.006*Math.sin(t*19.1)));
+  hearthFire.update(t);
   for(let i=0;i<smoke.length;i++){const age=(t*.13+i/smoke.length)%1,p=smoke[i];p.position.set(-1.55+.65*(1-Math.exp(-age*12))+.15*age*age,4.55+Math.max(0,age-.2)*1.8,-.9+.13*Math.sin(6*age+i)*age);p.scale.setScalar(.09+.55*age);p.material.opacity=.21*Math.sin(Math.PI*age);}
-  chime.rotation.z=Math.sin(t*1.1)*.025;chime.rotation.x=Math.sin(t*.73)*.012;
+  const age=t-chimeTime,impulse=t>0&&Number.isFinite(age)&&age>=0?Math.exp(-age*2.8)*Math.sin(age*18)*.15:0;
+  chime.rotation.z=Math.sin(t*1.1)*.025+impulse;chime.rotation.x=Math.sin(t*.73)*.012+impulse*.3;
  }
  function setWarmth(amount){
+  artistry.update(0,amount);sign.material.emissiveIntensity=.04+.15*amount;
+  hearthFire.setWarmth(amount);
   warmth=amount;lanternGlowMat.opacity=amount*.22;for(const glow of lanternGlows)glow.visible=lanternGlowMat.opacity>=.002;
   glass.opacity=.05+.035*amount;glass.emissiveIntensity=.002+.014*amount;glass.envMapIntensity=1.85-.85*amount;
   frostedGlass.opacity=.46+.12*amount;frostedGlass.emissiveIntensity=.02+.20*amount;frostedGlass.envMapIntensity=1.6-.55*amount;
-  interiorFurnitureMat.emissive.lerpColors(dayInteriorBounce,nightHearthBounce,amount);interiorFurnitureMat.emissiveIntensity=.13+.13*amount;
+  interiorFurnitureMat.emissive.lerpColors(dayInteriorBounce,nightWindowBounce,amount);interiorFurnitureMat.emissiveIntensity=.13+.13*amount;
   interiorGlowMat.emissiveIntensity=.18+1.55*amount;
   bulbs.emissiveIntensity=.035+1.6*amount;light.intensity=28*amount;
  }
@@ -324,9 +426,9 @@ export function makeCabin(){
    }).then(parts=>{if(parts){doorFallbackGroup.visible=false;hangingFallbackGroup.visible=false;}return parts;}),
    loadAsset('cabin-interior.glb','cabin-interior-room','interiorStatus',target,obj=>{
     obj.material=obj.material.name==='Cabin_Interior_Glow'?interiorGlowMat:interiorFurnitureMat;
-   })
+   }).then(room=>{hearthFire.group.visible=!!room;if(room)toys.bind(room.getObjectByName('cabin-interior-furniture'));return room;})
   ]).then(([parts])=>parts||null);
   return partsPromise;
  }
- return {group,walls,setWarmth,updateSmoke,loadParts};
+ return {group,walls,setWarmth,updateSmoke,loadParts,hitTarget,chimeTarget,ringChime,toys};
 }

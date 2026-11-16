@@ -56,6 +56,25 @@ def beam(a,b,r=.004,mat=iron):
  av,bv=Vector(P(*a)),Vector(P(*b));d=bv-av
  bpy.ops.mesh.primitive_cylinder_add(vertices=6,radius=r,depth=d.length,location=(av+bv)/2);o=own(bpy.context.object,mat);o.rotation_euler=d.to_track_quat('Z','Y').to_euler();return o
 
+def spun_glass(x,z,profile,segments=20):
+ vertices=[];faces=[]
+ for radius,y in profile:
+  for i in range(segments):
+   a=i*math.tau/segments;vertices.append(P(x+radius*math.cos(a),y,z+radius*math.sin(a)))
+ for ring in range(len(profile)-1):
+  for i in range(segments):
+   a=ring*segments+i;b=ring*segments+(i+1)%segments;faces.append((a,a+segments,b+segments,b))
+ mesh=bpy.data.meshes.new('hand-blown-hurricane-glass');mesh.from_pydata(vertices,[],faces);mesh.update()
+ uv=mesh.uv_layers.new(name='UVMap')
+ for face in mesh.polygons:
+  seam=any(v%segments==0 for v in face.vertices) and any(v%segments==segments-1 for v in face.vertices)
+  for loop in face.loop_indices:
+   vertex=mesh.loops[loop].vertex_index;ring,index=divmod(vertex,segments)
+   uv.data[loop].uv=(1.0 if seam and index==0 else index/segments,ring/(len(profile)-1))
+ obj=bpy.data.objects.new('porch-hanging-lamp-glass',mesh);collection.objects.link(obj);obj.data.materials.append(frost)
+ for face in mesh.polygons:face.use_smooth=True
+ return obj
+
 def join(objects,name):
  bpy.ops.object.select_all(action='DESELECT')
  for o in objects:o.select_set(True)
@@ -100,18 +119,28 @@ chimney=join(a,'chimney-cap-detail')
 
 # Copper kerosene lantern replaces the hanging procedural lantern, at the same support hook.
 x,z=-.88,2.47
-a=[cylinder(x,1.81,z,.104,.055,iron,vertices=12),cylinder(x,1.85,z,.079,.055,brass,vertices=12),cylinder(x,2.09,z,.105,.025,brass,vertices=12),torus(x,2.205,z,.057,.006,brass,20,4)]
-bpy.ops.mesh.primitive_cone_add(vertices=12,radius1=.13,radius2=.055,depth=.057,location=P(x,2.13,z));a.append(own(bpy.context.object,iron))
+a=[cylinder(x,1.81,z,.104,.055,brass,vertices=12),cylinder(x,1.85,z,.079,.055,brass,vertices=12),cylinder(x,2.09,z,.105,.025,brass,vertices=12),torus(x,2.205,z,.057,.006,brass,20,4)]
+bpy.ops.mesh.primitive_cone_add(vertices=12,radius1=.13,radius2=.055,depth=.057,location=P(x,2.13,z));a.append(own(bpy.context.object,brass))
 for dx in [-.081,.081]:
  for dz in [-.065,.065]:a.append(cylinder(x+dx,1.972,z+dz,.005,.235,brass,vertices=6))
 a.extend([beam((x-.09,2.09,z),(x-.045,2.19,z),.005),beam((x+.09,2.09,z),(x+.045,2.19,z),.005),cylinder(x,1.93,z,.026,.028,brass,vertices=8)])
 lamp=join(a,'porch-hanging-lamp')
-glass=[]
-for dz in [-.066,.066]:glass.append(cube(x,1.972,z+dz,.146,.21,.003,frost))
-for dx in [-.077,.077]:glass.append(cube(x+dx,1.972,z,.003,.21,.129,frost))
-o=join(glass,'porch-hanging-lamp-glass');o.parent=lamp
+o=spun_glass(x,z,[(.046,1.872),(.064,1.890),(.075,1.930),(.077,1.980),(.066,2.035),(.047,2.074)],20);o.parent=lamp
 bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=.013,location=P(x,1.952,z));o=own(bpy.context.object,wick);o.scale=(.55,.55,1.65);o.name='porch-lamp-wick-mesh';o.parent=lamp
 marker=bpy.data.objects.new('porch-lamp-wick',None);collection.objects.link(marker);marker.location=P(x,1.952,z);marker.parent=lamp;marker['purpose']='warm light attachment'
+
+# Fine hammered-gold floral curls sit on the walnut sign, with the original
+# four screws retained by the procedural cabin. They share one accessory mesh.
+ornaments=[]
+for side in [-1,1]:
+ for top in [-1,1]:
+  points=[]
+  for i in range(7):
+   t=i/6;a=t*math.pi*1.6;r=.032*(1-t*.72)
+   points.append((side*(.80+math.cos(a)*r),2.295+top*(.105+math.sin(a)*r*.58),2.024))
+  for p,q in zip(points,points[1:]):ornaments.append(beam(p,q,.0023,brass))
+  ornaments.append(rivet(side*.85,2.295+top*.10,2.027,r=.004))
+join(ornaments,'sign-carved-brass-corners')
 
 # Triangulate before counting/export; budget measures triangles, stricter than polygon count.
 counts={}

@@ -7,13 +7,13 @@ function wingGeometry(){
     new THREE.CubicBezierCurve3(new THREE.Vector3(.105,.008,.01),new THREE.Vector3(.15,.015,.10),new THREE.Vector3(.025,.005,.10),new THREE.Vector3(0,0,.015))
   ];
   const outline=curves.flatMap(c=>c.getPoints(5)),positions=[.045,.012,.008],softness=[1],indices=[];
-  outline.forEach(p=>{positions.push(p.x,p.y,p.z);softness.push(.3);});
+  outline.forEach(p=>{positions.push(p.x,p.y,p.z);softness.push(.58);});
   for(let i=0;i<outline.length;i++)indices.push(0,i+1,(i+1)%outline.length+1);
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   g.setAttribute('wingSoftness',new THREE.Float32BufferAttribute(softness,1));g.setIndex(indices);g.computeVertexNormals();return g;
 }
 
-export function createButterflies(parent,perches){
+export function createButterflies(parent,perches,{romanticRoute=null}={}){
   if(perches.length<6)throw new Error('Butterflies need six real flower perches');
   const group=new THREE.Group();group.name='meadow-butterflies';parent.add(group);
   const geometry=wingGeometry(),bodyGeometry=new THREE.OctahedronGeometry(.03),bodyMaterial=new THREE.MeshStandardMaterial({color:'#65756a',roughness:.8});
@@ -22,14 +22,14 @@ export function createButterflies(parent,perches){
   const clamp=THREE.MathUtils.clamp,ease=t=>t*t*t*(t*(t*6-15)+10);
   for(let i=0;i<2;i++){
     const root=new THREE.Group();root.name=i?'pale-blue-butterfly':'blush-white-butterfly';group.add(root);
-    const material=new THREE.MeshStandardMaterial({color:i?'#bce6f4':'#fff0f1',side:THREE.DoubleSide,roughness:.65,transparent:true,opacity:.92,depthWrite:false,forceSinglePass:true});
+    const material=new THREE.MeshStandardMaterial({color:i?'#a892b8':'#42b883',side:THREE.DoubleSide,roughness:.65,transparent:true,opacity:.92,depthWrite:false,forceSinglePass:true});
     material.onBeforeCompile=shader=>{
-      shader.vertexShader='attribute float wingSoftness;\nvarying float vWingSoftness;\n'+shader.vertexShader;
-      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvWingSoftness=wingSoftness;');
-      shader.fragmentShader='varying float vWingSoftness;\n'+shader.fragmentShader;
-      shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>','diffuseColor.a*=vWingSoftness;\n#include <alphatest_fragment>');
+      shader.vertexShader='attribute float wingSoftness;\nvarying float vWingSoftness;varying vec3 vWingPosition;\n'+shader.vertexShader;
+      shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvWingSoftness=wingSoftness;vWingPosition=position;');
+      shader.fragmentShader='varying float vWingSoftness;varying vec3 vWingPosition;\n'+shader.fragmentShader;
+      shader.fragmentShader=shader.fragmentShader.replace('#include <alphatest_fragment>','float vein=pow(abs(sin(atan(vWingPosition.z,max(.001,vWingPosition.x))*7.0)),22.0);diffuseColor.rgb*=1.0-vein*.28;diffuseColor.a*=vWingSoftness;\n#include <alphatest_fragment>');
     };
-    material.customProgramCacheKey=()=> 'meadow-butterfly-feathered-wing';materials.push(material);
+    material.customProgramCacheKey=()=> 'meadow-butterfly-veined-wing-v2';materials.push(material);
     const body=new THREE.Mesh(bodyGeometry,bodyMaterial);body.scale.set(.28,.3,1);root.add(body);
     const wings=[new THREE.Mesh(geometry,material),new THREE.Mesh(geometry,material)];wings[0].scale.x=-1;root.add(...wings);
     const b={root,wings,index:i,perch:i*3,next:i*3,state:'perched',age:0,duration:3.4+i*.35,start:new THREE.Vector3(),flights:0,phase:i*1.9};
@@ -67,9 +67,25 @@ export function createButterflies(parent,perches){
       b.root.position.z+=Math.sin(angle)*envelope*(.9+b.index*.2);
       b.root.position.y+=envelope*(.85+b.index*.12);
       b.root.rotation.set(Math.sin(angle)*.2*envelope,angle,.15*Math.cos(angle)*envelope);
-      const flap=.35+Math.sin(clock*Math.PI*2*7+b.phase)*.65;
+      const flap=.35+Math.sin(clock*14+b.phase)*.65;
       b.wings[0].rotation.z=-flap;b.wings[1].rotation.z=flap;
       if(u===1){b.perch=b.next;b.state='perched';rest(b);}
+    }
+    group.userData.clock=clock;return true;
+  }
+  const originalUpdate=update;
+  function updateWithRoute(delta,options={}){
+    if(!romanticRoute)return originalUpdate(delta,options);
+    if(disposed||options.covered)return false;
+    if(options.reducedMotion){if(!reduced)setReducedMotion(true);return false;}
+    if(reduced)setReducedMotion(false);
+    paused=false;clock+=clamp(delta,0,.06);
+    for(const b of butterflies){
+      b.state='flying';b.flights=Math.floor(clock/26)+1;b.age=clock;
+      const u=(clock/26+b.index*.46)%1;
+      romanticRoute.getPointAt(u,b.root.position);romanticRoute.getTangentAt(u,target);
+      b.root.position.y+=.12*Math.sin(clock*2+b.phase);b.root.rotation.set(.10*Math.sin(clock*3),Math.atan2(target.x,target.z),.10*Math.cos(clock*2));
+      const flap=.35+Math.sin(clock*14+b.phase)*.65;b.wings[0].rotation.z=-flap;b.wings[1].rotation.z=flap;
     }
     group.userData.clock=clock;return true;
   }
@@ -77,5 +93,5 @@ export function createButterflies(parent,perches){
   function dispose(){if(disposed)return;disposed=true;group.removeFromParent();geometry.dispose();bodyGeometry.dispose();bodyMaterial.dispose();materials.forEach(m=>m.dispose());}
   butterflies.forEach(b=>rest(b));
   group.userData.triangles=2*(geometry.index.count/3*2+bodyGeometry.attributes.position.count/3);
-  return {group,update,setReducedMotion,disturb,dispose,getState:()=>({clock,states:butterflies.map(b=>({state:b.state,perch:b.perch,flights:b.flights,age:b.age,position:b.root.position.toArray()}))})};
+  return {group,update:updateWithRoute,setReducedMotion,disturb,dispose,getState:()=>({clock,route:!!romanticRoute,colours:materials.map(m=>'#'+m.color.getHexString()),states:butterflies.map(b=>({state:b.state,perch:b.perch,flights:b.flights,age:b.age,position:b.root.position.toArray()}))})};
 }

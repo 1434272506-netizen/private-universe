@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {memories,letters,providedPhotoImport} from '../src/personal-content.js';
 import {waitForContentReady} from './review-fixture-storage.mjs';
-const expectedMemories=memories.length+providedPhotoImport.photos.length;
+const expectedMemories=new Set([...memories,...providedPhotoImport.photos].map(record=>record.id||record.image)).size;
 
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 const page=await browser.newPage({viewport:{width:1600,height:1000},deviceScaleFactor:1});

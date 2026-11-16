@@ -1,4 +1,5 @@
 import './garden-audio.css';
+import {cabinWaltz} from './natural/playful-audio.js';
 
 const DATABASE='private-universe-audio',PREFERENCES='private-universe-sound-preferences';
 const MUSIC_LIMIT=50*1024*1024;
@@ -267,5 +268,10 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     idleTimer=setTimeout(idleSoon,900);
     return {context,bus:master,volume:preferences.natureVolume};
   }
-  update();return {open,close,stop,startCeremony,getState,ready,dispose,chimeOutput,get musicPlaying(){return !player.paused;}};
+  async function toggleRadio(){
+    if(disposed||busy)return;
+    if(!track)setTrack(cabinWaltz());
+    await toggleMusic();
+  }
+  update();return {open,close,stop,startCeremony,getState,ready,dispose,chimeOutput,toggleRadio,get musicPlaying(){return !player.paused;}};
 }

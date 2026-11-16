@@ -6,6 +6,8 @@ await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
 try{
   const page=await browser.newPage({viewport:{width:1120,height:740}});
+  // Isolate pointer impulses from autonomous fish/turtle wakes before the first GPU step.
+  await page.addInitScript(()=>Object.defineProperty(window,'__PU',{configurable:true,set(p){Object.defineProperty(window,'__PU',{value:p,writable:true,configurable:true});p.creekEcology.setCounts({silver:0,clown:0,turtle:0});p.koi.setWakesEnabled(false);}}));
   const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});

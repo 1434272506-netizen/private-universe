@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import {mkdir,writeFile,stat} from 'node:fs/promises';
 import {chromium} from 'playwright-core';
 import baseline from './fixtures/cabin-structure-baseline.json' with {type:'json'};
+import interiorManifest from '../public/models/cabin-interior.manifest.json' with {type:'json'};
+import {reviewCabinInteractions} from './review-cabin-interactions.mjs';
+import {reviewCabinHearth,reviewCabinProduction} from './review-cabin-hearth.mjs';
+import {reviewCabinArtistry} from './review-cabin-artistry.mjs';
+import {reviewCabinCozy} from './review-cabin-cozy.mjs';
 const hasParts=await stat('public/models/cabin-parts.glb').then(()=>true,()=>false);
 const out='work/qa/cabin';await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.BROWSER_PATH||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'});
@@ -19,7 +24,7 @@ try{
    return {keys:Object.keys(c).sort(),name:c.group.name,walls:c.walls.every(o=>o.isMesh),values,a,b,moving};
   });
   for(const key of ['group','setWarmth','updateSmoke','walls'])assert.ok(result.keys.includes(key));assert.ok(result.keys.includes('loadParts'));assert.equal(result.name,'secret-haven-cabin');assert.ok(result.walls);
-  assert.deepEqual(result.values,[0,28*.2,28*.63,28]);assert.deepEqual(result.a,result.b);assert.notDeepEqual(result.a,result.moving);observations.interface=result;
+  assert.deepEqual(result.values,[0,28*.2,28*.63,28]);assert.deepEqual(result.a,result.b);assert.ok(result.moving.every(Number.isFinite));assert.notDeepEqual(result.a,result.moving);observations.interface=result;
  });
  await check('21 ground-fitted lamps clear the expanded porch footprint and telescope deck',async()=>{
   const result=await page.evaluate(async()=>{
@@ -31,7 +36,7 @@ try{
   const result=await page.evaluate(async()=>{
    const {CABIN_SITE,ground}=await import('/src/natural/land.js'),p=window.__PU,c=p.scene.getObjectByName('secret-haven-cabin'),f=c.userData.architecture;
    let vertices=0,finite=true,triangles=0;const names=[];
-   c.traverse(o=>{if(o.isMesh){names.push(o.name);const g=o.geometry,a=g.attributes.position;vertices+=a.count;triangles+=(g.index?.count||a.count)/3;for(let i=0;i<a.array.length;i++)if(!Number.isFinite(a.array[i]))finite=false;}});
+   c.updateWorldMatrix(true,true);c.traverse(o=>{if(!o.matrixWorld.elements.every(Number.isFinite))finite=false;if(o.isMesh){names.push(o.name);const g=o.geometry,a=g.attributes.position;vertices+=a.count;triangles+=(g.index?.count||a.count)/3;for(let i=0;i<a.array.length;i++)if(!Number.isFinite(a.array[i]))finite=false;}});
    const groundAt=(x,z)=>{const world=c.localToWorld(p.camera.position.clone().set(x,0,z));return ground(world.x,world.z)-c.position.y;};
    const feet=f.supports.map(({x,z,bottom,top})=>({depth:groundAt(x,z)-bottom,top,bottom}));
    const landing=f.steps.at(-1);
@@ -88,7 +93,8 @@ try{
    }
    return {meshes,triangles,bounds,excluded,shadows,rgba,lights,extraLight:!!c.getObjectByName('artisan-lamp-wick-light'),occluders:p.occluders.filter(o=>{let a=o;while(a){if(a===c)return true;a=a.parent;}return false;}).map(o=>o.name),shader:shader.fragmentShader,vertexColors:furniture.vertexColors&&glow.vertexColors,curves,rays};
   });
-  observations.interior=result;assert.deepEqual(result.meshes.sort(),['cabin-interior-furniture','cabin-interior-glow']);assert.equal(result.triangles,4420);assert.ok(result.triangles<6000);
+  observations.interior=result;assert.deepEqual(result.meshes.sort(),['cabin-interior-furniture','cabin-interior-glow']);assert.equal(result.triangles,interiorManifest.totalTriangles);assert.ok(result.triangles<6000);
+  assert.equal(interiorManifest.drawCallMeshes,2);assert.equal(interiorManifest.theme,'forest-green-and-lavender / sleepy-pink-piglet');assert.ok(interiorManifest.layout.piglet[2]>interiorManifest.layout.sofa[2]);
   assert.ok(result.excluded&&result.shadows&&result.rgba&&result.vertexColors);assert.equal(result.lights,4);assert.equal(result.extraLight,false);
   assert.deepEqual(result.occluders.sort(),['Our Secret Haven · 2025.09.23','cabin-crafted-timber','cabin-log-end-grain','cabin-stonework'].sort());
   assert.ok(result.bounds[0]>=-1.960001&&result.bounds[3]<=1.960001&&result.bounds[1]>=.349&&result.bounds[4]<=3.635&&result.bounds[2]>=-1.575&&result.bounds[5]<=1.675);
@@ -126,11 +132,16 @@ try{
   });
   const amount=mode==='day'?0:mode==='sunset'?.63:1;assert.ok(Math.abs(observations[mode].glassOpacity-(.05+.035*amount))<1e-10);assert.ok(Math.abs(observations[mode].glassEmission-(.002+.014*amount))<1e-10);assert.ok(Math.abs(observations[mode].envMapIntensity-(1.85-.85*amount))<1e-10);
  }
+ await reviewCabinHearth(page,check,observations,out);
+ await reviewCabinArtistry(page,check,observations,out);
+ await reviewCabinCozy(page,check,observations,out);
  await check('Malformed optional GLB degrades to the procedural cabin without runtime errors',async()=>{
   await page.route('**/models/cabin-parts.glb',route=>route.fulfill({status:200,contentType:'model/gltf-binary',body:'deliberately invalid optional asset'}));
   const result=await page.evaluate(async()=>{const {makeCabin}=await import('/src/natural/cabin.js'),c=makeCabin();const result=await c.loadParts();c.setWarmth(1);return {missing:result===null,fallback:c.group.getObjectByName('cabin-door-hardware-fallback').visible&&c.group.getObjectByName('cabin-hanging-lantern-fallback').visible,intensity:c.group.getObjectByName('porch-warm-light').intensity,roomLoaded:!!c.group.getObjectByName('cabin-interior-room')};});
   assert.ok(result.missing&&result.fallback&&result.roomLoaded);assert.equal(result.intensity,28);await page.unroute('**/models/cabin-parts.glb');
  });
+ await page.close();observations.interactions=await reviewCabinInteractions(browser,errors,out);
+ observations.production=await reviewCabinProduction(browser,errors,out);
  assert.ok(observations.night.glassEmission<.5);assert.deepEqual(errors,[]);console.log('PASS window emission controlled; console.error=0, pageerror=0');
 }catch(e){failure=e;console.error(e);}
 finally{await writeFile(`${out}/result.json`,JSON.stringify({checks,observations,errors,failure:failure?.stack||null},null,2));await browser.close();}

@@ -5,12 +5,13 @@
     "window-hardware": 2080,
     "chimney-cap-detail": 1004,
     "porch-hanging-lamp": 484,
-    "porch-hanging-lamp-glass": 48,
-    "porch-lamp-wick-mesh": 20
+    "porch-hanging-lamp-glass": 200,
+    "porch-lamp-wick-mesh": 20,
+    "sign-carved-brass-corners": 560
   },
-  "totalTriangles": 4068,
+  "totalTriangles": 4780,
   "units": "metres, Three.js Y-up",
-  "bytes": 257948,
+  "bytes": 307648,
   "groups": [
     "door-hardware",
     "window-hardware",

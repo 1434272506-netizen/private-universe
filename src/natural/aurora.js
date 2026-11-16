@@ -13,9 +13,9 @@ import * as THREE from 'three';
  */
 export function makeAurora(time) {
   const radius = 115, height = 92;
-  // 横跨北天低空至天顶深空的开阔弧形光幕 (约 175 度展角)
+  // 横跨西北神木上方天幕的柔和弧形光幕 (紧凑聚拢于西天神木区域，为右侧烟花留出纯净深空)
   const geometry = new THREE.CylinderGeometry(
-    radius, radius, height, 64, 20, true, Math.PI * 0.55, Math.PI * 0.95
+    radius, radius, height, 64, 20, true, Math.PI * 0.95, Math.PI * 0.50
   );
 
   const uniforms = {
@@ -100,20 +100,20 @@ export function makeAurora(time) {
           auroraColor = mix(cLavender, cAmethyst, smoothstep(0.68, 0.95, curY));
         }
 
-        // 柔和光感辐射 (高光处更加通透晶莹，不失真成白斑)
+        // 柔和空灵光感辐射 (通透轻柔，消除刺眼白斑，衬托夜空深邃感)
         float radiance = curtain * alphaMask * uOpacity;
-        vec3 finalColor = auroraColor * (radiance * 1.5 + pow(radiance, 2.0) * 0.55);
+        vec3 finalColor = auroraColor * (radiance * 1.10 + pow(radiance, 1.8) * 0.20);
 
-        gl_FragColor = vec4(finalColor, clamp(radiance * 1.15, 0.0, 1.0));
+        gl_FragColor = vec4(finalColor, clamp(radiance * 0.85, 0.0, 0.85));
       }
     `
   });
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'emerald-amethyst-aurora';
-  // 悬挂于浮岛后方地平线高度至天顶
-  mesh.position.set(0, 32, -15);
-  mesh.rotation.y = -0.32; // 对齐长椅北向视野
+  // 悬挂于浮岛后方神木天际线高度至天顶，优雅环抱左侧神木
+  mesh.position.set(-25, 30, -18);
+  mesh.rotation.y = 0.25; // 旋转完全聚拢于西天神木天顶区域，右侧烟花天穹全暗纯净无碰撞
 
   return {
     mesh,

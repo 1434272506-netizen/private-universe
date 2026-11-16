@@ -19,7 +19,7 @@ try{
   });
   await page.mouse.click(...point);
   await page.locator('#anniversary-card[open]').waitFor({timeout:8000});
-  assert.equal(await page.locator('#anniversary-title').innerText(),'与你相恋的第 '+daysTogether()+' 天');
+  assert.equal(await page.locator('#anniversary-title').innerText(),'从 2025.09.23 至今，我们已经携手走过了整整 '+daysTogether()+' 天');
   await page.locator('.card-stars').click();
   await page.waitForFunction(()=>window.__PU.flying);
   await page.waitForFunction(()=>!window.__PU.flying);

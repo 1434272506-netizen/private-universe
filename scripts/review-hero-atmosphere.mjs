@@ -19,7 +19,35 @@ try {
       const p=window.__PU, u=p.scene.getObjectByName('spring-sky').material.uniforms;
       return p.currentView==='hero' && !p.flying && p.getAtmosphere()===mode && u[mode==='sunset'?'dusk':'night'].value===1;
     },mode);
-    const png=await page.screenshot({path:out+'/hero-'+mode+'.png'});
+    let png=await page.screenshot({path:out+'/hero-'+mode+'.png'});
+    if(mode==='night'){
+      // The reference latitude describes spring-sky, not the separately tilted
+      // aurora/Milky Way/cloud layers. Keep the composite shot above and measure
+      // the real base sky alone so those layers cannot contaminate background samples.
+      const base64=await page.evaluate(async()=>{
+        const {Scene}=await import('/node_modules/three/build/three.module.js');
+        const p=window.__PU, isolated=new Scene();
+        isolated.add(p.scene.getObjectByName('spring-sky').clone());
+        const captureSky=()=>{
+          p.renderer.render(isolated,p.camera);
+          return p.renderer.domElement.toDataURL('image/png').split(',')[1];
+        };
+        try{
+          const before=captureSky();
+          if(!p.fireworks.launch(p.camera,{pattern:'willow'})) throw Error('Sky review could not launch');
+          p.fireworks.update(1.32);
+          if(captureSky()===before) throw Error('Galaxy highlights did not respond during the burst');
+          p.fireworks.update(8);
+          const after=captureSky();
+          if(after!==before) throw Error('The settled sky differs after fireworks');
+          return after;
+        } finally {
+          p.fireworks.clear();
+          p.lighting.render(0);
+        }
+      });
+      png=Buffer.from(base64,'base64');await fs.writeFile(out+'/hero-night-base-sky.png',png);
+    }
     return page.evaluate(async({base64,mode})=>{
       const img=new Image();img.src='data:image/png;base64,'+base64;await img.decode();
       const canvas=document.createElement('canvas');
@@ -32,8 +60,8 @@ try {
       let total=0,red=0,gold=0,coral=0;
       for(let y=2;y<img.height*.36;y+=3)for(let x=4;x<img.width-4;x+=3){
         const u=x/img.width,v=y/img.height;
-        // Exclude HUD, tree crown and island silhouette from sky photometry.
-        if((v<.10 && (u<.26 || u>.79)) || (v>.13 && u>.31 && u<.70))continue;
+        // Only the sunset uses the composite with HUD and tree in front of it.
+        if(mode==='sunset' && ((v<.10 && (u<.26 || u>.79)) || (v>.13 && u<.70 && u>.31)))continue;
         const i=4*(y*img.width+x),[r,g,b]=data.subarray(i,i+3);
         if(mode==='sunset'){
           total++;red+=Number(r/(r+g+b)>=.45);
@@ -41,9 +69,11 @@ try {
           coral+=Number(r>g*1.15 && b>=g*.90);
         }else{
           ray.set(2*u-1,1-2*v,.5).unproject(camera).sub(camera.position).normalize();
-          const lat=Math.abs((.68*ray.x+.62*(ray.y+.84)+.38*ray.z)/Math.hypot(ray.x,ray.y+.84,ray.z)/Math.hypot(.68,.62,.38));
+          // Sample the luminous spine of the current northwest arc within
+          // three angular degrees of its great circle, clear of its dust lanes.
+          const lat=Math.abs((.80*ray.x+.58*(ray.y+.84)+.15*ray.z)/Math.hypot(ray.x,ray.y+.84,ray.z)/Math.hypot(.80,.58,.15));
           const zone=stripes[Math.min(2,Math.floor(u*3))];
-          if(lat<.13 && ray.y>-.2)zone.band.push(lum(r,g,b));
+          if(lat<Math.sin(3*Math.PI/180) && ray.y>-.2)zone.band.push(lum(r,g,b));
           if(lat>.24 || ray.y<-.37)zone.background.push(lum(r,g,b));
         }
       }

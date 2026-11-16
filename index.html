@@ -47,10 +47,11 @@
         <button class="icon-button" id="help-toggle" type="button" aria-label="查看操作说明" aria-expanded="false" aria-controls="help-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M9.7 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.3 1.8-2.3 3.6M12 16.6h.01"/></svg></button>
         <button class="icon-button" id="fullscreen" type="button" aria-label="进入全屏"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 4H4v4.5M15.5 4H20v4.5M20 15.5V20h-4.5M8.5 20H4v-4.5"/></svg></button>
       </div>
+      <button id="launch-fireworks" type="button" hidden aria-label="放烟花" title="给今晚放一场绿紫烟花"><span aria-hidden="true">✧</span> 放烟花</button>
       <aside id="help-panel" hidden>
         <p class="help-title">慢慢看，不必赶路。</p>
         <dl><div><dt>拖动鼠标</dt><dd>环绕花园</dd></div><div><dt>滚动滚轮</dt><dd>靠近 / 退远</dd></div><div><dt>轻点物件</dt><dd>发现藏着的故事</dd></div><div><dt><kbd>Esc</kbd></dt><dd>回到花园</dd></div><div><dt><kbd>R</kbd></dt><dd>回到全景</dd></div></dl>
-        <div class="help-places" aria-label="用键盘探索花园"><button type="button" data-place="meadow">向日葵花田 <span>↗</span></button><button type="button" data-place="swing">双人秋千 <span>↗</span></button><button type="button" data-place="picnic">草地野餐 <span>↗</span></button><button type="button" data-place="campfire">暖意篝火 <span>↗</span></button><button type="button" data-place="telescope">观星望远镜 <span>↗</span></button><button type="button" data-place="ribbon">看看白丝带 <span>↗</span></button><button type="button" data-place="mailbox">打开信箱 <span>↗</span></button><button type="button" data-place="bench">在长椅坐一会儿 <span>↗</span></button></div>
+        <div class="help-places" aria-label="用键盘探索花园"><button type="button" data-place="meadow">向日葵花田 <span>↗</span></button><button type="button" data-place="swing">双人秋千 <span>↗</span></button><button type="button" data-place="picnic">草地野餐 <span>↗</span></button><button type="button" data-place="campfire">暖意篝火 <span>↗</span></button><button type="button" data-place="telescope">观星望远镜 <span>↗</span></button><button type="button" data-place="cabin">秘密木屋 <span>↗</span></button><button type="button" data-place="ribbon">看看白丝带 <span>↗</span></button><button type="button" data-place="mailbox">打开信箱 <span>↗</span></button><button type="button" data-place="bench">在长椅坐一会儿 <span>↗</span></button></div>
         <button id="replay" class="quiet-button" type="button">再看一次初见</button>
       </aside>
       <aside id="tour-status" hidden aria-live="polite"><span id="tour-chapter"></span><button id="tour-next" type="button">下一站 ↗</button></aside>
@@ -66,6 +67,9 @@
     <button id="return-view" class="return-view" type="button" hidden><span aria-hidden="true">←</span> 回到花园</button>
     <p id="scene-error" class="scene-error" role="alert" hidden></p>
     <span id="announcement" class="sr-only" role="status" aria-live="polite"></span>
+    <dialog id="cabin-journal-dialog" aria-labelledby="cabin-journal-title">
+      <section class="cabin-journal-paper"><button class="journal-close" type="button" aria-label="收起手账">×</button><span class="journal-eyebrow">OUR LITTLE DAYS</span><h2 id="cabin-journal-title">今日待办</h2><p>和小猪一起守家，等某人回来 ❤️</p><span class="journal-signature">慢慢来，家里一直暖着。</span></section>
+    </dialog>
     <dialog id="memory-dialog" class="story-dialog" aria-labelledby="memory-title">
       <section class="ribbon-surface story-surface">
         <button class="close-story icon-button" type="button" aria-label="收起照片长卷"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>

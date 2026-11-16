@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {FIREWORK_BACKDROP, makeFireworkBackdropUniforms} from './fireworks.js';
 
 /**
  * 🌌 梦幻全天穹银河拱桥与深空星云天带 (Arching Milky Way Galaxy & Cosmic Nebula)
@@ -8,12 +9,13 @@ import * as THREE from 'three';
  */
 export function makeMilkyWay(time) {
   const radius = 210;
-  // 天穹大圆带几何体：跨越 240°
+  // 天穹大圆带几何体：聚拢于西北天际
   const geometry = new THREE.CylinderGeometry(
-    radius, radius, 130, 96, 24, true, -Math.PI * 0.35, Math.PI * 1.35
+    radius, radius, 130, 96, 24, true, Math.PI * 0.95, Math.PI * 0.55
   );
 
   const uniforms = {
+    ...makeFireworkBackdropUniforms(),
     uTime: time,
     uOpacity: { value: 0 }
   };
@@ -35,6 +37,7 @@ export function makeMilkyWay(time) {
       }
     `,
     fragmentShader: `
+      ${FIREWORK_BACKDROP}
       uniform float uTime;
       uniform float uOpacity;
       varying vec2 vUv;
@@ -80,11 +83,11 @@ export function makeMilkyWay(time) {
         // 细腻密集的银河微星尘 (Micro Stardust flecks)
         float stars = pow(hash(vUv * 850.0 + fract(uTime * 0.01)), 26.0) * coreProfile * 4.5;
 
-        // 色彩阶梯：深紫晶 -> 宇宙孔雀蓝 -> 玫瑰星云粉 -> 核心白银星光
-        vec3 colViolet = vec3(0.28, 0.12, 0.58);
-        vec3 colCyan   = vec3(0.05, 0.42, 0.72);
-        vec3 colRose   = vec3(0.72, 0.18, 0.45);
-        vec3 colCore   = vec3(1.4, 1.5, 1.8);
+        // 色彩阶梯：深紫晶 -> 宇宙孔雀蓝 -> 玫瑰星云粉 -> 柔和星光核心
+        vec3 colViolet = vec3(0.24, 0.10, 0.52);
+        vec3 colCyan   = vec3(0.05, 0.38, 0.65);
+        vec3 colRose   = vec3(0.65, 0.16, 0.40);
+        vec3 colCore   = vec3(0.85, 0.95, 1.15);
 
         vec3 nebulaColor = mix(colViolet, colCyan, cloud1);
         nebulaColor = mix(nebulaColor, colRose, cloud2 * 0.55);
@@ -93,17 +96,17 @@ export function makeMilkyWay(time) {
         // 沿天际线与横向曲面边缘进行双向高阶余弦平滑羽化，彻底杜绝生硬切割切面
         float horizonFade = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.75, vUv.y);
         float edgeFadeX = smoothstep(0.0, 0.32, vUv.x) * smoothstep(1.0, 0.68, vUv.x);
-        float finalAlpha = nebula * horizonFade * edgeFadeX * uOpacity * 0.88;
+        float finalAlpha = nebula * horizonFade * edgeFadeX * uOpacity * 0.70;
 
-        gl_FragColor = vec4(nebulaColor, finalAlpha);
+      gl_FragColor = vec4(exposeGalaxy(nebulaColor,normalize(vWorld-cameraPosition)), finalAlpha);
       }
     `
   });
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'celestial-milky-way';
-  mesh.rotation.z = 0.48; // 倾斜划过天穹
-  mesh.rotation.y = 0.65; // 旋转对准西南-天顶-东北轴向
+  mesh.rotation.z = 0.25; // 优雅倾斜跨越天穹
+  mesh.rotation.y = 0.25; // 旋转对准西北神木区域，为右侧留出纯净深邃夜空
 
   return {
     mesh,

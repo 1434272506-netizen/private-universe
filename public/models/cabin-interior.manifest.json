@@ -1,21 +1,21 @@
 {
   "blender": "4.5.9 LTS",
   "triangles": {
-    "cabin-interior-furniture": 3836,
-    "cabin-interior-glow": 584
+    "cabin-interior-furniture": 5524,
+    "cabin-interior-glow": 394
   },
-  "totalTriangles": 4420,
+  "totalTriangles": 5918,
   "drawCallMeshes": 2,
   "bounds": {
     "min": [
       -1.9589999914169312,
       0.34999996423721313,
-      -1.566999912261963
+      -1.5525000095367432
     ],
     "max": [
       1.9589999914169312,
-      3.6335983276367188,
-      1.6740000247955322
+      3.6064014434814453,
+      1.6475000381469727
     ]
   },
   "layout": {
@@ -30,10 +30,600 @@
       0.377,
       0.9
     ],
-    "plantScale": 1.15
+    "plantScale": 1.15,
+    "piglet": [
+      1.2799999999999998,
+      0.745,
+      0.36
+    ],
+    "pigletYaw": 0.05224000845115752
+  },
+  "theme": "forest-green-and-lavender / sleepy-pink-piglet",
+  "keepsakes": {
+    "portrait": [
+      -1.2464967099889621,
+      1.735,
+      -0.7801453458375489
+    ],
+    "openJournal": [
+      0.5,
+      1.064,
+      -0.96
+    ],
+    "quill": [
+      0.634,
+      1.12,
+      -1.02
+    ]
+  },
+  "assets": [
+    {
+      "asset": "survival/resource-wood.glb",
+      "position": [
+        -1.33296242139736,
+        0.64,
+        -0.9638099334712015
+      ],
+      "scale": 2.05,
+      "yaw": 0.56,
+      "sourceTriangles": 64,
+      "triangles": 64
+    },
+    {
+      "asset": "furniture/plantSmall1.glb",
+      "position": [
+        -1.5713702178198283,
+        1.472,
+        -0.718939105063686
+      ],
+      "scale": 1.55,
+      "yaw": 0.44,
+      "sourceTriangles": 102,
+      "triangles": 102
+    },
+    {
+      "asset": "holiday/wreath.glb",
+      "position": [
+        -1.25203392303482,
+        2.02,
+        -0.7919071174594084
+      ],
+      "scale": 0.45,
+      "yaw": 0.44,
+      "sourceTriangles": 288,
+      "triangles": 72
+    },
+    {
+      "asset": "furniture/rugRound.glb",
+      "position": [
+        -0.14,
+        0.377,
+        -0.02
+      ],
+      "scale": 1.95,
+      "yaw": 0.0,
+      "sourceTriangles": 188,
+      "triangles": 166
+    },
+    {
+      "asset": "furniture/tableCoffee.glb",
+      "position": [
+        -0.18,
+        0.377,
+        -0.04
+      ],
+      "scale": 1.55,
+      "yaw": 0.22,
+      "sourceTriangles": 124,
+      "triangles": 124
+    },
+    {
+      "asset": "food/cup-saucer.glb",
+      "position": [
+        -0.3,
+        0.734,
+        0.045
+      ],
+      "scale": 0.29,
+      "yaw": 0.0,
+      "sourceTriangles": 116,
+      "triangles": 82
+    },
+    {
+      "asset": "food/cup-tea.glb",
+      "position": [
+        -0.3,
+        0.745,
+        0.045
+      ],
+      "scale": 0.34,
+      "yaw": 0.4,
+      "sourceTriangles": 144,
+      "triangles": 129
+    },
+    {
+      "asset": "food/cup-saucer.glb",
+      "position": [
+        -0.07,
+        0.734,
+        0.1
+      ],
+      "scale": 0.35,
+      "yaw": 0.0,
+      "sourceTriangles": 116,
+      "triangles": 82
+    },
+    {
+      "asset": "food/cookie.glb",
+      "position": [
+        -0.1,
+        0.748,
+        0.08
+      ],
+      "scale": 0.25,
+      "yaw": 0.15,
+      "sourceTriangles": 68,
+      "triangles": 52
+    },
+    {
+      "asset": "food/cookie.glb",
+      "position": [
+        -0.041,
+        0.748,
+        0.08
+      ],
+      "scale": 0.25,
+      "yaw": -0.35,
+      "sourceTriangles": 68,
+      "triangles": 52
+    },
+    {
+      "asset": "food/cookie.glb",
+      "position": [
+        -0.07,
+        0.748,
+        0.12
+      ],
+      "scale": 0.25,
+      "yaw": 0.8,
+      "sourceTriangles": 68,
+      "triangles": 52
+    },
+    {
+      "asset": "furniture/loungeSofa.glb",
+      "position": [
+        1.42,
+        0.377,
+        -0.02
+      ],
+      "scale": 1.4,
+      "yaw": -1.5707963267948966,
+      "sourceTriangles": 128,
+      "triangles": 128
+    },
+    {
+      "asset": "furniture/loungeChairRelax.glb",
+      "position": [
+        -1.06,
+        0.377,
+        0.6
+      ],
+      "scale": 1.65,
+      "yaw": 2.4997778838388136,
+      "sourceTriangles": 188,
+      "triangles": 188
+    },
+    {
+      "asset": "furniture/pillowLong.glb",
+      "position": [
+        -1.0250000000000001,
+        0.67,
+        0.565
+      ],
+      "scale": 0.8,
+      "yaw": 2.4997778838388136,
+      "sourceTriangles": 50,
+      "triangles": 50
+    },
+    {
+      "asset": "furniture/lampRoundFloor.glb",
+      "position": [
+        -1.6,
+        0.377,
+        0.96
+      ],
+      "scale": 1.85,
+      "yaw": 0.0,
+      "sourceTriangles": 76,
+      "triangles": 76
+    },
+    {
+      "asset": "furniture/desk.glb",
+      "position": [
+        0.18,
+        0.377,
+        -1.14
+      ],
+      "scale": 1.72,
+      "yaw": 0.0,
+      "sourceTriangles": 198,
+      "triangles": 198
+    },
+    {
+      "asset": "furniture/lampRoundTable.glb",
+      "position": [
+        -0.2,
+        1.037,
+        -1.15
+      ],
+      "scale": 1.78,
+      "yaw": 0.0,
+      "sourceTriangles": 76,
+      "triangles": 76
+    },
+    {
+      "asset": "furniture/books.glb",
+      "position": [
+        0.24,
+        1.037,
+        -1.12
+      ],
+      "scale": 1.7,
+      "yaw": 0.18,
+      "sourceTriangles": 62,
+      "triangles": 62
+    },
+    {
+      "asset": "food/mug.glb",
+      "position": [
+        0.5,
+        1.037,
+        -1.28
+      ],
+      "scale": 0.44,
+      "yaw": -0.6,
+      "sourceTriangles": 232,
+      "triangles": 232
+    },
+    {
+      "asset": "furniture/bookcaseOpen.glb",
+      "position": [
+        1.44,
+        0.377,
+        -1.24
+      ],
+      "scale": 1.86,
+      "yaw": 0.0,
+      "sourceTriangles": 320,
+      "triangles": 320
+    },
+    {
+      "asset": "furniture/books.glb",
+      "position": [
+        1.2999999999999998,
+        0.76,
+        -1.21
+      ],
+      "scale": 1.72,
+      "yaw": 0.1,
+      "sourceTriangles": 62,
+      "triangles": 62
+    },
+    {
+      "asset": "furniture/books.glb",
+      "position": [
+        1.2999999999999998,
+        1.58,
+        -1.21
+      ],
+      "scale": 1.42,
+      "yaw": 0.08,
+      "sourceTriangles": 62,
+      "triangles": 62
+    },
+    {
+      "asset": "furniture/plantSmall2.glb",
+      "position": [
+        1.63,
+        1.58,
+        -1.2
+      ],
+      "scale": 1.3,
+      "yaw": 0.4,
+      "sourceTriangles": 158,
+      "triangles": 158
+    },
+    {
+      "asset": "furniture/plantSmall3.glb",
+      "position": [
+        1.63,
+        0.76,
+        -1.2
+      ],
+      "scale": 1.25,
+      "yaw": -0.3,
+      "sourceTriangles": 98,
+      "triangles": 98
+    },
+    {
+      "asset": "furniture/radio.glb",
+      "position": [
+        1.44,
+        1.17,
+        -1.205
+      ],
+      "scale": 1.3,
+      "yaw": 0.0,
+      "sourceTriangles": 432,
+      "triangles": 345
+    },
+    {
+      "asset": "furniture/lampWall.glb",
+      "position": [
+        -0.32,
+        1.84,
+        -1.458
+      ],
+      "scale": 1.1,
+      "yaw": 0.0,
+      "sourceTriangles": 42,
+      "triangles": 42
+    },
+    {
+      "asset": "furniture/lampWall.glb",
+      "position": [
+        0.68,
+        1.84,
+        -1.458
+      ],
+      "scale": 1.1,
+      "yaw": 0.0,
+      "sourceTriangles": 42,
+      "triangles": 42
+    },
+    {
+      "asset": "furniture/pottedPlant.glb",
+      "position": [
+        1.78,
+        0.377,
+        0.9
+      ],
+      "scale": 1.15,
+      "yaw": -0.4,
+      "sourceTriangles": 60,
+      "triangles": 60
+    },
+    {
+      "asset": "furniture/pottedPlant.glb",
+      "position": [
+        -0.72,
+        0.377,
+        1.08
+      ],
+      "scale": 0.9,
+      "yaw": 0.3,
+      "sourceTriangles": 60,
+      "triangles": 60
+    },
+    {
+      "asset": "furniture/pottedPlant.glb",
+      "position": [
+        0.91,
+        0.377,
+        -1.24
+      ],
+      "scale": 0.72,
+      "yaw": 0.3,
+      "sourceTriangles": 60,
+      "triangles": 60
+    }
+  ],
+  "optimization": {
+    "hiddenSurfaceTrianglesRemoved": 544,
+    "coplanarTrianglesRemoved": 62,
+    "pigSurfaceBudget": 1066
+  },
+  "surfaceChecks": {
+    "openPagesY": 0.7528965473175049,
+    "floorY": 0.3760000467300415,
+    "portraitDepth": 0.4650000333786011
+  },
+  "piglet": {
+    "design": "compact-crown-button-nose-fine-ribbon-v2",
+    "authoredSegments": [
+      20,
+      12
+    ],
+    "sourceSurfaceTriangles": 5280,
+    "surfaceTriangles": 1044,
+    "protectedDetailTriangles": 364,
+    "metrics": [
+      {
+        "name": "soft-lavender-back-cushion",
+        "min": [
+          -0.10700006037950516,
+          0.023000000044703484,
+          -0.14800000190734863
+        ],
+        "max": [
+          0.1430000215768814,
+          0.32899999618530273,
+          -0.0559999905526638
+        ]
+      },
+      {
+        "name": "pear-body",
+        "min": [
+          -0.12137629091739655,
+          0.004999999888241291,
+          -0.1143300011754036
+        ],
+        "max": [
+          0.12137624621391296,
+          0.2750000059604645,
+          0.09292083233594894
+        ]
+      },
+      {
+        "name": "head",
+        "min": [
+          -0.11900005489587784,
+          0.17299999296665192,
+          -0.07800000160932541
+        ],
+        "max": [
+          0.11900001764297485,
+          0.37700000405311584,
+          0.10600002110004425
+        ]
+      },
+      {
+        "name": "button-snout",
+        "min": [
+          -0.0390000194311142,
+          0.23999999463558197,
+          0.10199999809265137
+        ],
+        "max": [
+          0.039000004529953,
+          0.2879999876022339,
+          0.12401133030653
+        ]
+      },
+      {
+        "name": "compact-ear--1",
+        "min": [
+          -0.1002272516489029,
+          0.3330000042915344,
+          0.011127485893666744
+        ],
+        "max": [
+          -0.062028639018535614,
+          0.3841567039489746,
+          0.04751996695995331
+        ]
+      },
+      {
+        "name": "hug-paw--1",
+        "min": [
+          -0.05400001257658005,
+          0.13199999928474426,
+          0.06300000101327896
+        ],
+        "max": [
+          -0.0019999968353658915,
+          0.18799999356269836,
+          0.12300001084804535
+        ]
+      },
+      {
+        "name": "compact-ear-1",
+        "min": [
+          0.062028635293245316,
+          0.3330000042915344,
+          0.011127485893666744
+        ],
+        "max": [
+          0.1002272516489029,
+          0.3841567039489746,
+          0.04751996695995331
+        ]
+      },
+      {
+        "name": "hug-paw-1",
+        "min": [
+          0.0019999875221401453,
+          0.13199999928474426,
+          0.06300000101327896
+        ],
+        "max": [
+          0.05400000140070915,
+          0.18799999356269836,
+          0.12300001084804535
+        ]
+      }
+    ],
+    "optimizedParts": [
+      {
+        "name": "detail",
+        "triangles": 30
+      },
+      {
+        "name": "soft-lavender-back-cushion",
+        "triangles": 44
+      },
+      {
+        "name": "pear-body",
+        "triangles": 206
+      },
+      {
+        "name": "head",
+        "triangles": 298
+      },
+      {
+        "name": "button-snout",
+        "triangles": 128
+      },
+      {
+        "name": "compact-ear--1",
+        "triangles": 56,
+        "embeddedVertices": 5
+      },
+      {
+        "name": "detail",
+        "triangles": 44
+      },
+      {
+        "name": "hug-paw--1",
+        "triangles": 62
+      },
+      {
+        "name": "compact-ear-1",
+        "triangles": 56,
+        "embeddedVertices": 5
+      },
+      {
+        "name": "detail",
+        "triangles": 44
+      },
+      {
+        "name": "hug-paw-1",
+        "triangles": 62
+      },
+      {
+        "name": "detail",
+        "triangles": 14
+      }
+    ],
+    "features": [
+      "pear-body",
+      "gradient-belly",
+      "rounded-forward-drooping-ears",
+      "compact-crown-pig-ears",
+      "button-snout",
+      "shallow-peach-nostrils",
+      "curved-smiling-eyelids",
+      "peach-blush",
+      "hugging-hands",
+      "lavender-bow",
+      "fine-silk-bow"
+    ]
+  },
+  "hearth": {
+    "staticFlames": 0,
+    "emberColors": [
+      "#d84212",
+      "#ff7420"
+    ],
+    "runtimeAnchor": [
+      -1.2988872641920801,
+      0.78,
+      -0.8914298004136044
+    ],
+    "yaw": 0.44
   },
   "units": "metres, Three.js Y-up",
-  "bytes": 314184,
+  "bytes": 357656,
   "groups": [
     "cabin-interior-furniture",
     "cabin-interior-glow"

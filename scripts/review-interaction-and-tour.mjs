@@ -43,9 +43,9 @@ try{
 
   await page.locator('#tour').click();
   assert.equal(await page.evaluate(()=>window.__PU.scenicTour.active),true);
-  const first=await page.locator('#tour-chapter').innerText();assert.match(first,/01 \/ 07/);
+  const first=await page.locator('#tour-chapter').innerText();assert.match(first,/01 \/ 08/);
   await page.locator('#tour-next').click();
-  assert.match(await page.locator('#tour-chapter').innerText(),/02 \/ 07/);
+  assert.match(await page.locator('#tour-chapter').innerText(),/02 \/ 08/);
   await settled();
   await page.waitForFunction(()=>{
     const p=window.__PU,rig=p.estateFeatures.swing.group.children.find(c=>c.isGroup);
@@ -79,14 +79,14 @@ try{
   }
   console.log('PASS tour: Escape, R and anniversary modal interrupt; base child order preserved');
   await page.locator('#tour').click();
-  for(const [i,key] of ['meadow','swing','tree','waterfall','campfire','telescope','hero'].entries()){
+  for(const [i,key] of ['meadow','swing','tree','waterfall','cabin','campfire','telescope','hero'].entries()){
     await settled();
     assert.deepEqual(await page.evaluate(()=>[window.__PU.scenicTour.index,window.__PU.currentView]),[i,key]);
     if(key==='telescope')await page.screenshot({path:'screenshots/22-tour-telescope-desktop.png'});
     await page.locator('#tour-next').click({timeout:5000});
   }
   assert.equal(await page.evaluate(()=>window.__PU.scenicTour.active),false);
-  console.log('PASS all seven tour destinations and peaceful final overview');
+  console.log('PASS all eight tour destinations and peaceful final overview');
   await page.evaluate(()=>{window.__PU.frame('hero');window.__PU.discover('create-surprise');});
   await page.locator('#choose-surprise-position').click();
   assert.equal(await page.evaluate(()=>window.__PU.placementPending),true);

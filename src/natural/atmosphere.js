@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {Sky} from 'three/addons/objects/Sky.js';
 import {makeCloudVolumes} from './clouds.js';
 import {makeMistRainbow} from './rainbow.js';
+import {FIREWORK_BACKDROP, makeFireworkBackdropUniforms} from './fireworks.js';
 
 export function makeAtmosphere(scene,renderer,time){
   const sunDirection=new THREE.Vector3(-11,10.5,7.5).normalize();
@@ -15,7 +16,8 @@ export function makeAtmosphere(scene,renderer,time){
   // Sky's native model treats the lower hemisphere as ground. Here the garden
   // floats above a cloud sea: retain air colour below the astronomical horizon.
   uniforms.dusk={value:0}; uniforms.night={value:0};
-  sky.material.fragmentShader='uniform float dusk,night;\n'+sky.material.fragmentShader;
+  Object.assign(uniforms,makeFireworkBackdropUniforms());
+  sky.material.fragmentShader=FIREWORK_BACKDROP+'\nuniform float dusk,night;\n'+sky.material.fragmentShader;
   sky.material.fragmentShader=sky.material.fragmentShader.replace(
     'gl_FragColor = vec4( texColor, 1.0 );',`
     vec3 lowerAir=mix(vec3(.66,.73,.77),vec3(.22,.43,.67),smoothstep(-.95,.15,direction.y));
@@ -97,9 +99,9 @@ export function makeAtmosphere(scene,renderer,time){
     // Map the celestial panorama onto the open air above the island's cloud sea.
     vec3 galaxyDirection = normalize(vec3(direction.x, direction.y + 0.84, direction.z));
 
-    // 2. Galactic Spherical Coordinates: Panoramic Arch crossing directly above the tree and moon
-    vec3 galNorm = normalize(vec3(0.68, 0.62, 0.38));
-    vec3 galCore = normalize(vec3(-0.35, 0.38, -0.85));
+    // 2. Galactic Spherical Coordinates: Panoramic Arch crowning the western tree canopy and moon
+    vec3 galNorm = normalize(vec3(0.80, 0.58, 0.15));
+    vec3 galCore = normalize(vec3(-0.55, 0.45, -0.70));
     vec3 galBinorm = normalize(cross(galNorm, galCore));
 
     float galLat = dot(galaxyDirection, galNorm);
@@ -121,7 +123,7 @@ export function makeAtmosphere(scene,renderer,time){
     float bandInner = exp(-(galLat * 8.0) * (galLat * 8.0));
     float band = bandOuter * clamp(wisp - darkRift * 0.36, 0.0, 1.0);
 
-    // 4. Galactic Core Bulge: Warm luminous bulge crowning the sky above the moon
+    // 4. Galactic Core Bulge: Warm luminous bulge crowning the sky above the tree and moon
     float coreDist = max(0.0, dot(galaxyDirection, galCore));
     float coreGlow = pow(coreDist, 20.0) * exp(-galLat * galLat * 120.0)
       * (0.16 + 0.48 * wisp) * (1.0 - 0.68 * darkRift);
@@ -136,20 +138,20 @@ export function makeAtmosphere(scene,renderer,time){
     float microStars = exp(-dot(local, local) / (dustRadius * dustRadius))
       * smoothstep(0.25, 0.68, noise(cell * 0.73)) * bandInner * 0.80;
 
-    // 6. Rich Romantic Palette: Deep Indigo, Twilight Violet, Radiant Amber Core
-    vec3 cOuter = vec3(0.18, 0.28, 0.65) * 1.8;  // Ethereal indigo
-    vec3 cMid   = vec3(0.65, 0.32, 0.78) * 2.2;  // Twilight violet
-    vec3 cCore  = vec3(1.55, 1.15, 0.72) * 2.8;  // Warm stellar amber core
-    vec3 cStars = vec3(2.8, 3.0, 3.6);  // Crystalline stardust sparkle
+    // 6. Rich Romantic Palette: Deep Indigo, Twilight Violet, Soft Amber Core
+    vec3 cOuter = vec3(0.14, 0.22, 0.55) * 1.5;  // Ethereal deep indigo
+    vec3 cMid   = vec3(0.52, 0.26, 0.68) * 1.8;  // Twilight violet
+    vec3 cCore  = vec3(1.15, 0.90, 0.62) * 1.8;  // Soft warm stellar amber core
+    vec3 cStars = vec3(2.2, 2.4, 3.0);            // Crystalline stardust sparkle
 
     vec3 nebCol = mix(cOuter, cMid, clamp(band * 1.4, 0.0, 1.0));
     nebCol = mix(nebCol, cCore, clamp(coreGlow * 1.6, 0.0, 1.0));
 
-    vec3 galaxyLight = (nebCol * (band * 1.35 + coreGlow * 1.55) + cStars * microStars) * skyElevation;
+    vec3 galaxyLight = (nebCol * (band * 1.15 + coreGlow * 1.25) + cStars * microStars) * skyElevation;
 
     // Deep Sky Dome Compositing with rich cosmic sapphire atmosphere
     vec3 darkSky = mix(vec3(0.014, 0.024, 0.060), vec3(0.042, 0.062, 0.105), horizon);
-    vec3 dark = darkSky + galaxyLight + moonBody + corona;
+    vec3 dark = darkSky + exposeGalaxy(galaxyLight,direction) + moonBody + corona;
     gl_FragColor = vec4(mix(texColor, dark, night), 1.0);`);
   // At the two settled endpoints the other sky has exactly zero blend weight.
   // Skip that hidden FBM/scattering work; transitions retain both original paths.

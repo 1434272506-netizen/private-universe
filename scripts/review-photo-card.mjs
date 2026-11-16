@@ -1,7 +1,8 @@
 import {chromium} from 'playwright-core';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import {providedPhotoImport} from '../src/personal-content.js';
+import {providedPhotoImport,memories} from '../src/personal-content.js';
+import {photoInspirations} from '../src/memory-display.js';
 import {waitForContentReady} from './review-fixture-storage.mjs';
 import {waitForPhotoPage,goToPhotoPage} from './review-photo-helpers.mjs';
 const out='work/qa/photo-card';await fs.mkdir(out,{recursive:true});
@@ -18,15 +19,14 @@ try{
   await page.goto(process.env.REVIEW_URL||'http://127.0.0.1:5173/',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>document.documentElement.dataset.sceneReady==='true',null,{timeout:90000});
   await waitForContentReady(page);await page.locator('#enter-direct').click();await openRibbon(page);
-  const spec=await fs.readFile('PHOTO-NARRATIVE-CARD-SPEC.md','utf8');
-  const rows=spec.split('\n').filter(line=>/^\| \*\*\d{2}\*\*/.test(line)).map(line=>line.split('|').map(cell=>cell.trim()));
-  await check('All ten original IDs render the exact narrative title and suggestion without fabricated dates',async()=>{
-    assert.equal(rows.length,10);
+  await check('All ten original IDs render the approved current title, caption and supplied date fallback',async()=>{
+    assert.equal(providedPhotoImport.photos.length,10);
     for(let i=0;i<10;i++){
+      const id=providedPhotoImport.photos[i].id,record=memories.find(m=>m.id===id),inspiration=photoInspirations[id];
       await goToPhotoPage(page,i+1,10);
-      assert.equal(await back().locator('.photo-back-title').textContent(),rows[i][4].replaceAll('*',''));
-      assert.equal(await back().locator('.photo-back-text').textContent(),rows[i][5].replace(/^“|”$/g,''));
-      assert.equal(await back().locator('.story-date').isHidden(),true);
+      assert.equal(await back().locator('.photo-back-title').textContent(),inspiration.title);
+      assert.equal(await back().locator('.photo-back-text').textContent(),record.caption||inspiration.note);
+      if(record.date)assert.equal(await back().locator('.story-date').textContent(),record.date);else assert.equal(await back().locator('.story-date').isHidden(),true);
       assert.equal(await card().getAttribute('aria-expanded'),'false');
     }
     await goToPhotoPage(page,1,10);await page.screenshot({path:out+'/front-desktop.png'});

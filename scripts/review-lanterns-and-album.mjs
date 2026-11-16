@@ -127,7 +127,7 @@ try{
   if(!production){
     for(const [width,height,label] of [[1280,800,'desktop'],[390,844,'mobile']]){
       await page.setViewportSize({width,height});
-      await page.evaluate(()=>window.__PU.scenicTour.start(5));
+      await page.evaluate(()=>window.__PU.scenicTour.start(6));
       await page.locator('#tour-status').waitFor({state:'visible'});
       await hud();await shot(`tour-hud-${label}`);
       await page.evaluate(()=>window.__PU.scenicTour.stop());

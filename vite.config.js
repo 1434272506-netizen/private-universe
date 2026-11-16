@@ -14,4 +14,14 @@ function fingerprint(directory){
 }
 fingerprint(publicRoot);
 // Offline reference pages under work/ are not application dependency entries.
-export default defineConfig({base:process.env.GARDEN_BASE_PATH||'/',define:{__GARDEN_ASSET_VERSION__:JSON.stringify(hash.digest('hex').slice(0,16))},optimizeDeps:{entries:['index.html']}});
+export default defineConfig({
+ base:process.env.GARDEN_BASE_PATH||'/',
+ define:{__GARDEN_ASSET_VERSION__:JSON.stringify(hash.digest('hex').slice(0,16))},
+ optimizeDeps:{entries:['index.html']},
+ // Separate the renderer/core/addons instead of hiding the large-bundle warning.
+ build:{rolldownOptions:{output:{codeSplitting:{groups:[
+  {name:'three-core',test:/node_modules[\\/]three[\\/]build[\\/]three\.core/},
+  {name:'three-renderer',test:/node_modules[\\/]three[\\/]build[\\/]three\.module/},
+  {name:'three-addons',test:/node_modules[\\/]three[\\/](examples|src)[\\/]/}
+ ]}}}}
+});
