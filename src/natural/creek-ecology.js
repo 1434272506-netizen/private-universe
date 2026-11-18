@@ -199,8 +199,9 @@ const fishVertexShader = `
     float aft = clamp((0.65 - p.y) / 1.75, 0.0, 1.2);
     p.x += sin(phase - aft * 4.2) * aft * aft * 0.22 + bend * aft * aft * 0.35;
 
-    vec4 wp = instanceMatrix * vec4(p, 1.0);
-    vWorldNormal = normalize(mat3(instanceMatrix) * n);
+    mat4 transform = modelMatrix * instanceMatrix;
+    vec4 wp = transform * vec4(p, 1.0);
+    vWorldNormal = normalize(mat3(transform) * n);
     gl_Position = projectionMatrix * viewMatrix * wp;
   }
 `;
@@ -379,6 +380,7 @@ export function makeCreekEcology(parent, options = {}) {
   const silverFish = [];
   const clownfish = [];
   let turtle = null;
+  let winter = 0;
 
   function initEntities() {
     silverFish.length = 0;
@@ -386,7 +388,8 @@ export function makeCreekEcology(parent, options = {}) {
 
     for (let i = 0; i < config.silverFish.count; i++) {
       const school = config.silverFish.schools[i % config.silverFish.schools.length];
-      const z = school.zMin + Math.random() * (school.zMax - school.zMin);
+      const z = school.zMin + Math.random() * (school.zMax - school.zMin)
+        + winter * (-.5 - (school.zMin + school.zMax) / 2);
       const bounds = channelBounds(z);
       const x = bounds.left + 0.2 + Math.random() * Math.max(0.1, bounds.right - bounds.left - 0.4);
       silverFish.push({
@@ -426,6 +429,7 @@ export function makeCreekEcology(parent, options = {}) {
       constrain(f, config.clownfish.zMin, config.clownfish.zMax);
       f.homeX = f.x;
       f.homeZ = f.z;
+      migrate(f, winter * 1.4);
     }
 
     turtle = config.turtle.count ? {
@@ -447,14 +451,16 @@ export function makeCreekEcology(parent, options = {}) {
 
   initEntities();
 
-  function setPose(obj, x, y, z, heading, pitch, scale) {
-    const forward = new THREE.Vector3(Math.sin(heading) * Math.cos(pitch), Math.sin(pitch), Math.cos(heading) * Math.cos(pitch)).normalize();
-    const up = new THREE.Vector3(0, 1, 0);
-    const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-    const realUp = new THREE.Vector3().crossVectors(right, forward).normalize();
-    obj.matrix.makeBasis(right, forward, realUp);
-    obj.matrix.scale(new THREE.Vector3(scale, scale, scale));
-    obj.matrix.setPosition(x, y, z);
+  function setPose(obj, x, y, z, heading, scale, thickness=1) {
+    const c = Math.cos(heading)*scale, s = Math.sin(heading)*scale;
+    obj.matrix.set(-c,s,0,x, 0,0,scale*thickness,y, s,c,0,z, 0,0,0,1);
+  }
+
+  // Translate each habitat along the stream without pushing its fish through a bank.
+  function migrate(f, dz) {
+    if (!dz) return;
+    f.x += creekX(f.z + dz) - creekX(f.z);
+    f.z += dz;
   }
 
   function constrain(entity,zMin,zMax,isTurtle=false){
@@ -475,7 +481,8 @@ export function makeCreekEcology(parent, options = {}) {
         surface = Math.min(surface, waterY(z));
       }
       const low = bed + bottom + .008, high = surface - top - .008;
-      return low <= high ? THREE.MathUtils.clamp(waterY(entity.z)-top-.015, low, high) : null;
+      const summerY = THREE.MathUtils.clamp(waterY(entity.z)-top-.015, low, high);
+      return low <= high ? THREE.MathUtils.lerp(summerY, Math.min(high, low + .018), isTurtle ? 0 : winter) : null;
     }
     let y = safeHeight();
     if (y === null) {
@@ -483,7 +490,7 @@ export function makeCreekEcology(parent, options = {}) {
       entity.x = center;
       y = safeHeight();
     }
-    if (y === null && entity.safeZ !== undefined) {
+    if (y === null && entity.safeZ >= zMin+margin && entity.safeZ <= zMax-margin) {
       entity.x = entity.safeX;
       entity.z = entity.safeZ;
       y = entity.safeY;
@@ -506,7 +513,7 @@ export function makeCreekEcology(parent, options = {}) {
   }
 
   function disturb(x, z, strength = 1) {
-    if (!(strength > 0) || options.reducedMotion?.()) return;
+    if (!(strength > 0) || winter >= .99 || options.reducedMotion?.()) return;
     const str = THREE.MathUtils.clamp(strength, 0.2, 1.5);
     const radius = 0.85 * (0.7 + str * 0.6);
     for (const f of silverFish) {
@@ -525,12 +532,16 @@ export function makeCreekEcology(parent, options = {}) {
       turtle.gliding = false;
       turtle.glideTimer = 3.5;
       turtle.targetHeading = Math.atan2(turtle.x - x, turtle.z - z);
-      rippleSystem?.addImpulseWorld(turtle.x, turtle.z, 0.22, -0.07);
+      rippleSystem?.addImpulseWorld?.(turtle.x, turtle.z, 0.22, -0.07);
     }
   }
 
-  function update(delta, time) {
+  function update(delta, time, winterWeight = winter) {
     delta=THREE.MathUtils.clamp(Number.isFinite(delta)?delta:0,0,.06);
+    const nextWinter = THREE.MathUtils.clamp(winterWeight, 0, 1);
+    const migration = nextWinter - winter;
+    winter = nextWinter;
+    const swimDelta = delta * (1 - .75 * winter);
     fishMat.uniforms.uTime.value = time;
     turtleMat.uniforms.clock.value = time;
 
@@ -538,12 +549,15 @@ export function makeCreekEcology(parent, options = {}) {
     let instIdx = 0;
     for (let i = 0; i < silverFish.length; i++) {
       const f = silverFish[i];
+      const shift = -.5 - (f.school.zMin + f.school.zMax) / 2;
+      migrate(f, shift * migration);
+      const zMin = f.school.zMin + shift*winter, zMax = f.school.zMax + shift*winter;
       f.excited = Math.max(0, f.excited - delta * 1.4);
       const speed = f.speed * (1 + Math.min(1.2, f.excited * 1.5));
-      f.phase += delta * (8 + f.speed * 6 + f.excited * 18);
+      f.phase += swimDelta * (8 + f.speed * 6 + f.excited * 18);
       if (f.excited < 0.25) {
-        if (f.z < f.school.zMin + 0.45) f.cruiseHeading = 0;
-        else if (f.z > f.school.zMax - 0.45) f.cruiseHeading = Math.PI;
+        if (f.z < zMin + 0.45) f.cruiseHeading = 0;
+        else if (f.z > zMax - 0.45) f.cruiseHeading = Math.PI;
         const cruise = f.cruiseHeading ?? 0;
         let dx = Math.sin(cruise), dz = Math.cos(cruise);
         for (const other of silverFish) {
@@ -562,17 +576,16 @@ export function makeCreekEcology(parent, options = {}) {
       if (f.x > b.right - 0.18) f.targetHeading = Math.sin(f.targetHeading) < 0 ? f.targetHeading : Math.PI * 1.65;
 
       const diff = Math.atan2(Math.sin(f.targetHeading - f.heading), Math.cos(f.targetHeading - f.heading));
-      f.heading += diff * Math.min(1.0, delta * (f.excited > 0.5 ? 8 : 3.5));
+      f.heading += diff * Math.min(1.0, swimDelta * (f.excited > 0.5 ? 8 : 3.5));
       f.bend = THREE.MathUtils.clamp(diff * (f.excited > 0.5 ? 0.8 : 0.4), -0.7, 0.7);
 
-      f.x += Math.sin(f.heading) * speed * delta;
-      f.z += Math.cos(f.heading) * speed * delta;
+      f.x += Math.sin(f.heading) * speed * swimDelta;
+      f.z += Math.cos(f.heading) * speed * swimDelta;
 
       // 深度锁定在河底与水面之间
-      const wy = waterY(f.z), gy = ground(f.x, f.z);
-      const y = constrain(f,f.school.zMin,f.school.zMax);
+      const y = constrain(f,zMin,zMax);
 
-      setPose(dummy, f.x, y, f.z, f.heading, 0, f.scale);
+      setPose(dummy, f.x, y, f.z, f.heading, f.scale);
       fishMesh.setMatrixAt(instIdx, dummy.matrix);
       fishStateAttr.setXYZW(instIdx, f.phase, f.kind, f.bend, f.scale);
       instIdx++;
@@ -581,31 +594,34 @@ export function makeCreekEcology(parent, options = {}) {
     // --- 小丑鱼推进 ---
     for (let i = 0; i < clownfish.length; i++) {
       const f = clownfish[i];
+      migrate(f, 1.4 * migration);
+      const shift = 1.4 * winter, homeZ = f.homeZ + shift;
+      const homeX = f.homeX + creekX(homeZ) - creekX(f.homeZ);
+      const zMin = config.clownfish.zMin + shift, zMax = config.clownfish.zMax + shift;
       f.excited = Math.max(0, f.excited - delta * 0.8);
-      f.phase += delta * (6.5 + f.excited * 10);
-      const distance = Math.hypot(f.homeX - f.x, f.homeZ - f.z);
+      f.phase += swimDelta * (6.5 + f.excited * 10);
+      const distance = Math.hypot(homeX - f.x, homeZ - f.z);
       if (f.excited > 0) {
-        if (distance > 0) f.targetHeading = Math.atan2(f.homeX - f.x, f.homeZ - f.z);
-        const step = Math.min(distance, f.speed * (1 + f.excited) * delta);
+        if (distance > 0) f.targetHeading = Math.atan2(homeX - f.x, homeZ - f.z);
+        const step = Math.min(distance, f.speed * (1 + f.excited) * swimDelta);
         f.x += Math.sin(f.targetHeading) * step;
         f.z += Math.cos(f.targetHeading) * step;
       } else {
-        if (Math.hypot(f.x - f.homeX, f.z - f.homeZ) > 0.45 || Math.random() < delta * 0.3) {
-          f.targetHeading = Math.atan2(f.homeX - f.x + (Math.random() - 0.5) * 0.2, f.homeZ - f.z + (Math.random() - 0.5) * 0.2);
+        if (distance > 0.45 || Math.random() < swimDelta * 0.3) {
+          f.targetHeading = Math.atan2(homeX - f.x + (Math.random() - 0.5) * 0.2, homeZ - f.z + (Math.random() - 0.5) * 0.2);
         }
         const b = channelBounds(f.z);
-        f.x = THREE.MathUtils.clamp(f.x + Math.sin(f.heading) * f.speed * delta, b.left + 0.12, b.right - 0.12);
-        f.z = THREE.MathUtils.clamp(f.z + Math.cos(f.heading) * f.speed * delta, config.clownfish.zMin, config.clownfish.zMax);
+        f.x = THREE.MathUtils.clamp(f.x + Math.sin(f.heading) * f.speed * swimDelta, b.left + 0.12, b.right - 0.12);
+        f.z = THREE.MathUtils.clamp(f.z + Math.cos(f.heading) * f.speed * swimDelta, zMin, zMax);
       }
 
       const diff = Math.atan2(Math.sin(f.targetHeading - f.heading), Math.cos(f.targetHeading - f.heading));
-      f.heading += diff * Math.min(1.0, delta * 3.0);
+      f.heading += diff * Math.min(1.0, swimDelta * 3.0);
       f.bend = THREE.MathUtils.clamp(diff * 0.3, -0.4, 0.4);
 
-      const wy = waterY(f.z), gy = ground(f.x, f.z);
-      const y = constrain(f,config.clownfish.zMin,config.clownfish.zMax);
+      const y = constrain(f,zMin,zMax);
 
-      setPose(dummy, f.x, y, f.z, f.heading, 0, f.scale);
+      setPose(dummy, f.x, y, f.z, f.heading, f.scale);
       fishMesh.setMatrixAt(instIdx, dummy.matrix);
       fishStateAttr.setXYZW(instIdx, f.phase, f.kind, f.bend, f.scale);
       instIdx++;
@@ -644,21 +660,19 @@ export function makeCreekEcology(parent, options = {}) {
       turtle.x += Math.sin(turtle.heading) * curSpeed * delta;
       turtle.z += Math.cos(turtle.heading) * curSpeed * delta;
 
-      const twy = waterY(turtle.z), tgy = ground(turtle.x, turtle.z);
       const ty = constrain(turtle,config.turtle.zMin,config.turtle.zMax,true);
 
-      setPose(turtleMesh, turtle.x, ty, turtle.z, turtle.heading, 0, turtle.scale);
-      turtleMesh.matrix.scale(new THREE.Vector3(1,1,.60));
+      setPose(turtleMesh, turtle.x, ty, turtle.z, turtle.heading, turtle.scale, .60);
       turtleMesh.matrixWorldNeedsUpdate=true;
       turtleMat.uniforms.stroke.value = turtle.stroke;
       turtleMat.uniforms.turn.value = turtle.turn;
 
       // 扑翼产生微小动态水波纹
-      if (rippleSystem && !turtle.gliding) {
+      if (rippleSystem && !turtle.gliding && winter < .5) {
         turtle.wakeTimer -= delta;
         if (turtle.wakeTimer <= 0) {
           turtle.wakeTimer = 0.45;
-          rippleSystem.addImpulseWorld(turtle.x, turtle.z, 0.15, -0.04);
+          rippleSystem.addImpulseWorld?.(turtle.x, turtle.z, 0.15, -0.04);
         }
       }
     }
@@ -680,7 +694,7 @@ export function makeCreekEcology(parent, options = {}) {
     setCounts,
     getConfig: () => structuredClone(config),
     getCounts: () => ({ silver: silverFish.length, clown: clownfish.length, turtle: turtle ? 1 : 0 }),
-    dispose(){parent.remove(fishMesh,turtleMesh);fishGeom.dispose();fishMat.dispose();turtleGeom.dispose();turtleMat.dispose();},
+    dispose(){parent.remove(fishMesh,turtleMesh);fishMesh.dispose();fishGeom.dispose();fishMat.dispose();turtleGeom.dispose();turtleMat.dispose();},
     fishMesh,
     turtleMesh
   };

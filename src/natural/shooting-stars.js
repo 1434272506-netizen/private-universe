@@ -1,25 +1,34 @@
 import * as THREE from 'three';
 
-// A single reusable ribbon, with the white nucleus drawn in the same pass.
-export function shootingStars(scene){
+export function meteorGeometry(){
   const length=14;
   const geometry=new THREE.PlaneGeometry(length+.5,.86);
-  geometry.translate(-length/2+.25,0,0);
+  return geometry.translate(-length/2+.25,0,0);
+}
+
+// The ambient meteor and wish shower share the same tapered tail and nucleus.
+export function meteorStreak(geometry, tint=new THREE.Color(.66,.82,1)){
   const material=new THREE.ShaderMaterial({
-    uniforms:{intensity:{value:0}}, transparent:true,depthWrite:false,
+    uniforms:{intensity:{value:0},tint:{value:tint}}, transparent:true,depthWrite:false,
     side:THREE.DoubleSide,blending:THREE.AdditiveBlending,
     vertexShader:`varying vec2 trail;
       void main(){trail=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-    fragmentShader:`uniform float intensity; varying vec2 trail;
+    fragmentShader:`uniform float intensity;uniform vec3 tint; varying vec2 trail;
       void main(){
         float y=abs(trail.y-.5)*2.;
         float head=exp(-pow((trail.x-.982)*55.,2.)-y*y*4.);
         float tail=pow(trail.x,1.8)*exp(-y*y*14.);
-        gl_FragColor=vec4(mix(vec3(.66,.82,1.),vec3(1.),head),min(1.,tail+head)*intensity);
+        gl_FragColor=vec4(mix(tint,vec3(1.4),head),min(1.,tail+head)*intensity);
       }`
   });
   const streak=new THREE.Mesh(geometry,material);
-  streak.name='wishing-meteor'; streak.visible=false; streak.renderOrder=-14;
+  streak.visible=false; streak.renderOrder=-14;
+  return streak;
+}
+
+export function shootingStars(scene){
+  const streak=meteorStreak(meteorGeometry());
+  streak.name='wishing-meteor';
   scene.add(streak);
   const origin=new THREE.Vector3(), travel=new THREE.Vector3(),width=new THREE.Vector3();
   const normal=new THREE.Vector3(),basis=new THREE.Matrix4();
@@ -42,7 +51,7 @@ export function shootingStars(scene){
     age+=delta;
     const t=Math.min(1,age/duration);
     streak.position.copy(origin).addScaledVector(travel,145*t);
-    material.uniforms.intensity.value=night*THREE.MathUtils.smoothstep(t,0,.12)*(1-THREE.MathUtils.smoothstep(t,.73,1));
+    streak.material.uniforms.intensity.value=night*THREE.MathUtils.smoothstep(t,0,.12)*(1-THREE.MathUtils.smoothstep(t,.73,1));
     streak.visible=t<1;
   };
 }

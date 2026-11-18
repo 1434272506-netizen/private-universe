@@ -285,7 +285,11 @@ export function makeMeadowEcology(parent){
   for(let i=0;i<3;i++){const a=i*Math.PI*2/3,root=[0,.055,0],left=[Math.cos(a-.55)*.04,.065,Math.sin(a-.55)*.04],tip=[Math.cos(a)*.065,.06,Math.sin(a)*.065],right=[Math.cos(a+.55)*.04,.065,Math.sin(a+.55)*.04];cloverSurface.triangle(root,left,tip,'#4c8652');cloverSurface.triangle(root,tip,right,'#68a45a');}
   const clover=batch('low-clover-mats',cloverSurface.finish(),plantMat(),48);
   for(let i=0;i<48;i++){
-    const center=i<24?[-4.4,1]:[4.6,2.1],a=random()*Math.PI*2,r=.15+random()*.75,x=center[0]+Math.cos(a)*r,z=center[1]+Math.sin(a)*r;
+    const center=i<24?[-4.4,1]:[4.6,2.1],a=random()*Math.PI*2,r=.15+random()*.75,z=center[1]+Math.sin(a)*r;
+    let x=center[0]+Math.cos(a)*r;
+    if(ground(x,z)<waterY(z)+.025){
+      const side=x<creekX(z)?-1:1;x=shore(z,side)+side*.08;
+    }
     dummy.position.set(x,ground(x,z)+.003,z);dummy.rotation.set(0,a,0);dummy.scale.setScalar(.8+random()*.4);dummy.updateMatrix();clover.setMatrixAt(i,dummy.matrix);
   }
   function writePlants(){

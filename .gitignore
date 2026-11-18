@@ -11,5 +11,6 @@ screenshots/*
 !screenshots/07-millennial-tree-and-cabin.png
 *.log
 .DS_Store
+.gemini/
 
 /release/

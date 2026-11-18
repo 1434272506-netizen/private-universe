@@ -1,5 +1,6 @@
 import './garden-audio.css';
 import {cabinWaltz} from './natural/playful-audio.js';
+import {makeNatureSoundscape} from './natural/nature-soundscape.js';
 
 const DATABASE='private-universe-audio',PREFERENCES='private-universe-sound-preferences';
 const MUSIC_LIMIT=50*1024*1024;
@@ -45,7 +46,7 @@ async function storedMusic(operation,record){
   });
 }
 
-export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
+export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{},seasons,camera,nightWeight}={}){
   const existing=document.querySelector('#sound-dialog');
   if(existing)throw new Error('花园声音面板已经准备好了。');
   const lifetime=new AbortController(),signal=lifetime.signal;
@@ -57,6 +58,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   let context=null,master=null,natureBus=null,musicBus=null,musicNode=null,natureGraph=null;
   let naturePlaying=false,natureStarting=false,musicStarting=false,track=null,musicURL=null,busy=false,disposed=false,returnFocus=null;
   let natureRequest=0,musicRequest=0;
+  let nextMixTime=0;
   let fadeTimer=null,idleTimer=null,audioGeneration=0;
   const player=new Audio();player.preload='metadata';player.loop=true;
   const entry=make('button','quiet-button sound-entry','听听花园');entry.id='garden-sound';entry.type='button';
@@ -66,7 +68,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   dialog.innerHTML=`<section class="sound-surface">
     <button type="button" class="sound-close icon-button" aria-label="收起花园声音"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     <header class="sound-heading"><span class="tiny-label">LISTEN TO THE AFTERNOON</span><h2 id="sound-title">听一会儿，春天。</h2><p>让风和溪水作伴，也可以放一首自己的歌。</p></header>
-    <section class="sound-section" aria-labelledby="nature-title"><div class="sound-section-heading"><div><h3 id="nature-title">花园里的声音</h3><p>风、叶间细响和溪流，轻轻铺在身边。</p></div><button id="nature-play" class="sound-control" type="button" aria-pressed="false">听听自然声</button></div><label class="sound-volume"><span>自然声的音量</span><input id="nature-volume" type="range" min="0" max="100" step="1"><output id="nature-volume-label"></output></label></section>
+    <section class="sound-section" aria-labelledby="nature-title"><div class="sound-section-heading"><div><h3 id="nature-title">花园里的声音</h3><p>走近溪边听流水，靠近篝火听木柴，夏夜还有虫蛙相和。</p></div><button id="nature-play" class="sound-control" type="button" aria-pressed="false">听听自然声</button></div><label class="sound-volume"><span>自然声的音量</span><input id="nature-volume" type="range" min="0" max="100" step="1"><output id="nature-volume-label"></output></label></section>
     <section class="sound-section" aria-labelledby="music-title"><div class="sound-section-heading"><div><h3 id="music-title">自己的音乐</h3><p id="music-name">还没有放入音乐</p></div><button id="music-play" class="sound-control" type="button" disabled>播放音乐</button></div><label class="sound-file"><span>选一首本机音乐</span><input id="music-file" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"><small>MP3、WAV、OGG、M4A 等浏览器支持的音频，最多 50 MB。</small></label><label class="sound-volume"><span>音乐的音量</span><input id="music-volume" type="range" min="0" max="100" step="1"><output id="music-volume-label"></output></label><button id="music-remove" class="quiet-button sound-remove" type="button" hidden>移除这首音乐</button></section>
     <footer class="sound-footer"><button id="sound-mute" class="sound-control sound-mute" type="button" aria-pressed="false">全部静音</button><p>音乐只保存在当前设备、浏览器和网址下。启封信笺时，风声与已收藏的音乐会轻轻响起；离开页面会暂停。</p></footer>
     <p id="sound-feedback" class="sound-feedback" role="status" aria-live="polite"></p>
@@ -74,6 +76,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   document.querySelector('#app').append(dialog);
   const $=selector=>dialog.querySelector(selector);
   const natureButton=$('#nature-play'),musicButton=$('#music-play'),muteButton=$('#sound-mute');
+  const speaker=document.getElementById('garden-speaker');
   const tell=(message,error=false)=>{const target=$('#sound-feedback');target.textContent=message;target.dataset.error=String(error);};
   function savePreferences(){
     try{localStorage.setItem(PREFERENCES,JSON.stringify(preferences));}
@@ -91,6 +94,13 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     dialog.dataset.naturePlaying=String(naturePlaying);dialog.dataset.musicPlaying=String(!player.paused);
     dialog.dataset.audioState=context?.state||'not-started';dialog.dataset.muted=String(preferences.muted);dialog.setAttribute('aria-busy',String(busy));
     entry.dataset.playing=String(naturePlaying||!player.paused);
+    if(speaker){
+      const audible=!preferences.muted&&(naturePlaying||!player.paused);
+      speaker.setAttribute('aria-pressed',String(audible));
+      speaker.title=audible?'静音花园声音':preferences.muted?'取消静音':'开启自然声景';
+      speaker.setAttribute('aria-label',speaker.title);
+      speaker.disabled=natureStarting;
+    }
   }
   function ramp(parameter,value,duration=.18){
     if(!context)return;const now=context.currentTime;parameter.cancelScheduledValues(now);parameter.setValueAtTime(parameter.value,now);parameter.linearRampToValueAtTime(value,now+duration);
@@ -111,27 +121,11 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     ramp(master.gain,preferences.muted?0:.72);update();return context;
   }
   function makeNature(){
-    if(natureGraph)return;
-    const buffer=context.createBuffer(2,context.sampleRate*9,context.sampleRate);
-    for(let channel=0;channel<2;channel++){
-      const values=buffer.getChannelData(channel);for(let i=0;i<values.length;i++)values[i]=(Math.random()*2-1)*.65;
-    }
-    const nodes=[],sources=[];
-    const layer=(frequency,type,gain,offset)=>{
-      const source=context.createBufferSource(),filter=context.createBiquadFilter(),volume=context.createGain();
-      source.buffer=buffer;source.loop=true;filter.type=type;filter.frequency.value=frequency;filter.Q.value=.5;volume.gain.value=gain;
-      source.connect(filter);filter.connect(volume);volume.connect(natureBus);source.start(0,offset);sources.push(source);nodes.push(filter,volume);return volume;
-    };
-    layer(340,'lowpass',.58,0); // Wind, kept below the sharp upper frequencies.
-    layer(1450,'bandpass',.075,2.3); // Soft continuous water texture.
-    const leaves=layer(2600,'bandpass',.028,5.7),swell=context.createOscillator(),depth=context.createGain();
-    swell.frequency.value=.13;depth.gain.value=.018;swell.connect(depth);depth.connect(leaves.gain);swell.start();sources.push(swell);nodes.push(depth);
-    natureGraph={sources,nodes};
+    natureGraph??=makeNatureSoundscape(context,{seasons,camera,nightWeight,output:natureBus});
+    natureGraph.setMuted(preferences.muted);
   }
   function releaseNature(){
-    if(!natureGraph)return;
-    for(const source of natureGraph.sources){try{source.stop();}catch{}source.disconnect();}
-    for(const node of natureGraph.nodes)node.disconnect();natureGraph=null;
+    natureGraph?.dispose();natureGraph=null;
   }
   function idleSoon(){
     clearTimeout(idleTimer);idleTimer=setTimeout(()=>{
@@ -204,7 +198,18 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   dialog.addEventListener('cancel',event=>{event.preventDefault();event.stopPropagation();close();},{signal});
   dialog.addEventListener('close',()=>{onClose();(returnFocus?.isConnected&&returnFocus.getClientRects().length?returnFocus:document.querySelector('#help-toggle')).focus({preventScroll:true});},{signal});
   natureButton.addEventListener('click',toggleNature,{signal});musicButton.addEventListener('click',toggleMusic,{signal});
-  muteButton.addEventListener('click',()=>{preferences.muted=!preferences.muted;if(master)ramp(master.gain,preferences.muted?0:.72);tell(preferences.muted?'全部声音已静音。':'已取消静音。');savePreferences();update();},{signal});
+  function setMuted(value){
+    preferences.muted=value;
+    if(master)ramp(master.gain,value?0:.72);
+    if(naturePlaying)natureGraph?.setMuted(value);
+    tell(value?'全部声音已静音。':'已取消静音。');savePreferences();update();
+  }
+  muteButton.addEventListener('click',()=>setMuted(!preferences.muted),{signal});
+  speaker?.addEventListener('click',()=>{
+    if(!preferences.muted&&(naturePlaying||!player.paused)){setMuted(true);return;}
+    if(preferences.muted)setMuted(false);
+    if(!naturePlaying&&player.paused)void toggleNature();
+  },{signal});
   for(const kind of ['nature','music'])$('#'+kind+'-volume').addEventListener('input',event=>{
     preferences[kind+'Volume']=clamp(Number(event.target.value)/100);
     if(kind==='nature'&&naturePlaying)ramp(natureBus.gain,preferences.natureVolume);
@@ -254,6 +259,7 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
   function dispose(){
     if(disposed)return;const wasOpen=dialog.open;if(wasOpen)dialog.close();disposed=true;natureRequest++;musicRequest++;clearTimeout(fadeTimer);clearTimeout(idleTimer);
     player.pause();player.removeAttribute('src');player.load();releaseNature();musicNode?.disconnect();
+    natureBus?.disconnect();musicBus?.disconnect();master?.disconnect();
     if(musicURL)URL.revokeObjectURL(musicURL);context?.close().catch(()=>{});lifetime.abort();entry.remove();dialog.remove();if(wasOpen)onClose();
   }
   const ready=storedMusic('read').then(record=>{
@@ -273,5 +279,10 @@ export function prepareGardenAudio({onOpen=()=>{},onClose=()=>{}}={}){
     if(!track)setTrack(cabinWaltz());
     await toggleMusic();
   }
-  update();return {open,close,stop,startCeremony,getState,ready,dispose,chimeOutput,toggleRadio,get musicPlaying(){return !player.paused;}};
+  update();return {open,close,stop,startCeremony,getState,ready,dispose,chimeOutput,toggleRadio,
+    updateSoundscape(){
+      if(naturePlaying && !preferences.muted && context.currentTime>=nextMixTime){
+        natureGraph?.update();nextMixTime=context.currentTime+.045;
+      }
+    },get musicPlaying(){return !player.paused;}};
 }

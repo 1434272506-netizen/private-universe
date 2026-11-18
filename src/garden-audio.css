@@ -1,4 +1,8 @@
 .sound-entry{display:block;width:100%;text-align:left;margin:5px 0 9px;font-family:var(--chinese)}
+#garden-speaker{background:#f5f3e8dc;border-color:#71857448}
+#garden-speaker[aria-pressed=true]{color:#335847;background:#e8efdf}
+#garden-speaker[aria-pressed=false] .speaker-waves,#garden-speaker[aria-pressed=true] .speaker-silent{display:none}
+@media(max-width:400px){.top-actions{gap:2px}.top-actions #garden-speaker{width:34px}}
 .sound-entry[data-playing='true']::after{content:' · 声音已打开';color:#869773;font:9px var(--sans);margin-left:8px}
 .sound-dialog{position:fixed;inset:0;width:100%;height:100%;max-width:100%;max-height:100%;margin:auto;padding:30px 22px;border:0;background:transparent;color:var(--ink);overflow:auto;overscroll-behavior:contain}
 .sound-dialog[open]{display:flex;align-items:flex-start;justify-content:center}

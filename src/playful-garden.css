@@ -12,3 +12,7 @@
 .cabin-journal-paper p{font:16px/2 var(--chinese);margin:0 0 34px}
 .journal-signature{display:block;text-align:right;font:12px var(--chinese);color:#68785b}
 @media(max-width:760px){#launch-fireworks{top:76px;padding:9px 12px;font-size:11px}.cabin-journal-paper{padding:44px 26px 30px}}
+#garden-ui .romantic-message{z-index:12;max-width:calc(100vw - 24px);padding:9px 17px;border:1px solid #fff9;border-radius:24px;background:#fff8edee;color:#563d48;box-shadow:0 3px 16px #36272b23;pointer-events:none;transition:opacity .22s}
+#garden-ui .romantic-message.is-visible{opacity:1}
+@media(max-width:760px){#garden-ui .romantic-message{top:126px;bottom:auto}#atmosphere-switcher button{padding-inline:8px}}
+@media(prefers-reduced-motion:reduce){#garden-ui .romantic-message{transition:none}}

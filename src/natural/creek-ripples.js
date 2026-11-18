@@ -168,6 +168,7 @@ export function makeCreekRipples(renderer, time) {
   }
   return {
     worldToUv,addImpulseWorld,addImpulseUv,
+    pulse(x,z,strength=.15){if(!disposed && strength>0)addImpulseWorld(x,z,.11,-strength);},
     getTexture(){return simRT0.texture;},
     getTarget(){return simRT0;},
     update(delta){

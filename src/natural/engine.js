@@ -1,4 +1,5 @@
 import {makeCreekEcology} from './creek-ecology.js';
+import {makeIslandEcology} from './island-ecology.js';
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {makeCreekChimes} from './chimes-audio.js';
@@ -10,6 +11,8 @@ import {makePlants,makeMeadowEcology} from './plants.js';
 import {createButterflies} from './butterflies.js';
 import {makeKoi} from './koi.js';
 import {makeFireworks} from './fireworks.js';
+import {makeSeasons} from './seasons.js';
+import {makeRomanticInteractions} from './romantic-interactions.js';
 import {playfulSound} from './playful-audio.js';
 import {makeCreekRipples} from './creek-ripples.js';
 import {makeWater} from './water.js';
@@ -25,7 +28,6 @@ import {makeLighting} from './lighting.js';
 import {loadCenterpieceTree} from './loveTree.js';
 import {presentRibbon} from '../ribbon-transition.js';
 import {prepareContentEditor} from '../content-editor.js';
-import {prepareGardenAudio} from '../garden-audio.js';
 import {prepareSurprises} from '../surprises.js';
 import {createSurpriseWorld} from './surprises.js';
 import {makeListeningPlayer} from './listening-player.js';
@@ -70,7 +72,9 @@ const fill=new THREE.DirectionalLight('#d3e3ed',.28);fill.position.set(6,3,-8);s
 
 const island=makeLand(scene);
 $('#loading').textContent='春风经过树梢，花园就快醒来了。';
-const treeAsset=await loadCenterpieceTree(island,time);
+const [treeAsset,{prepareGardenAudio}]=await Promise.all([
+  loadCenterpieceTree(island,time),import('../garden-audio.js')
+]);
 const cabin=makeCabin();
 cabin.group.position.set(CABIN_SITE.x,ground(CABIN_SITE.x,CABIN_SITE.z),CABIN_SITE.z);
 cabin.group.rotation.y=CABIN_SITE.yaw;
@@ -127,6 +131,13 @@ for(const [x,y,z,scale] of [[-34,-20,-50,.32],[21,-24,-68,.25]]){
 scene.updateMatrixWorld(true);
 const lighting=makeLighting(renderer,scene,camera,{cabin});
 lighting.resize(innerWidth,innerHeight);
+const seasons=makeSeasons(scene,{camera,lighting,cabin,treeAsset});
+$('#blizzard-toggle').addEventListener('click',()=>{
+  if (canvasUI.inert || $('#atmosphere-switcher').hidden) return;
+  seasons.setBlizzard(!seasons.getBlizzard());
+  requestSceneFrame();
+});
+let snowShadowWeight=0;
 
 // Fit the actual 3D silhouette, including instanced foliage, from every overview.
 const points=[],temp=new THREE.Vector3(),matrix=new THREE.Matrix4();
@@ -145,6 +156,7 @@ island.traverse(object=>{
 for(const x of [treeAsset.bounds.min.x,treeAsset.bounds.max.x])
   for(const y of [treeAsset.bounds.min.y,treeAsset.bounds.max.y])
     for(const z of [treeAsset.bounds.min.z,treeAsset.bounds.max.z])points.push(new THREE.Vector3(x,y,z));
+const islandEcology=makeIslandEcology(scene,island,{camera,creekRipples,seasons,creekEcology,koi,reducedMotion:()=>reducedMotion});
 const target=new THREE.Vector3(-.4,1.7,0);
 const directions={hero:[.12,.35,.93],side:[.94,.24,.25],overhead:[.15,.94,.31],opposite:[-.18,.53,-.86]};
 const ribbon=island.getObjectByName('memory-ribbon'),redTies=[];
@@ -160,13 +172,17 @@ for(const [key,x,y,z] of [['swing',-15.5,1.9,-2],['picnic',13.2,.8,.8],['campfir
 const presets={
   ribbon:{position:anchors.ribbon.clone().add(new THREE.Vector3(.35,1.8,8)).toArray(),target:anchors.ribbon.toArray(),min:4.2,title:'记忆，系在枝头。',note:'The memory ribbon.'},
   get cabin(){return getCabinView(camera.aspect);},
+  get 'snow-yard'(){return {position:camera.aspect<.8?[2.8,4.9,6.8]:[1.3,4.6,7.1],
+    target:camera.aspect<.8?[-2.6,1.2,1.78]:[-1.35,1.12,1.8],min:1.3,title:'门前的雪地，留下了我们两行脚印。',note:'Two paths through the snow.'};},
   meadow:{position:[-20.5,2.35,6.8],target:[-16.2,1.35,1.8],min:3.8,title:'风过金浪，花海正仰望晨光。',note:'Sunflowers & lavender in bloom.'},
   swing:{position:[-10.8,2.3,.85],target:[-15.5,2.05,-2],min:3.6,title:'秋千轻荡，春风都在耳畔。',note:'Swaying in the breeze together.'},
   picnic:{position:[15.8,2.05,3.6],target:[12.9,.85,.55],min:3.2,title:'把午后的时光铺在草地上。',note:'A picnic, just for us.'},
-  campfire:{position:[17.6,2.25,-4.4],target:[14.6,.72,-1.4],min:3.5,title:'添一捧暖意，等星光落下。',note:'Warm embers under our sky.'},
+  get campfire(){return {position:camera.aspect<.8?[18.96,3.31,-6.29]:[17.6,2.25,-4.4],
+    target:camera.aspect<.8?[14.61,1.1,-1.94]:[14.6,.72,-1.4],min:3.5,title:'添一捧暖意，等星光落下。',note:'Warm embers under our sky.'};},
   telescope:{position:[13.6,1.9,6.4],target:[19.4,3.55,-1.2],min:1.8,title:'顺着望远镜，仰望这片星海。',note:'Toward the crescent moon.'},
   waterfall:{target:[creekX(WATER_END),-1.65,WATER_END+.45],position:[creekX(WATER_END)+2.8,.4,WATER_END+8],min:3.5,title:'水落进云里。',note:'Where water meets the clouds.'},
-  sky:{target:[-14,17,18],position:[3,2.3,6],min:8,title:'抬头，云正经过太阳。',note:'A little closer to the sky.'},
+  get sky(){const night=canvasUI.dataset.atmosphere==='night';return {target:[-14,17,18],position:[3,2.3,6],min:8,
+    title:night?'轻点夜空，许一个心愿。':'抬头，云正经过太阳。',note:night?'Make a wish under our stars.':'A little closer to the sky.'};},
   tree:{target:[-3.4,2.5,.1],position:[-.3,4.3,9.3],min:6.8,title:'记忆，系在枝头。',note:'The memory ribbon.'},
   mailbox:{target:[4.65,1.65,-1.9],position:[6.2,3.25,3.9],min:4.3,title:'写给彼此的春天。',note:'Letters between us.'},
   bench:{target:[CABIN_SITE.x,2.1,CABIN_SITE.z],position:props.bench.position.clone().add(new THREE.Vector3(0,1.28,0)).toArray(),min:7,title:'坐一会儿，春天还很长。',note:'Stay a little longer.'},
@@ -191,6 +207,10 @@ const renderedPosition=camera.position.clone(),renderedTarget=controls.target.cl
 function requestSceneFrame(){sceneFrameRequested=true;}
 const ease=t=>t*t*t*(t*(t*6-15)+10);
 function announce(text){$('#announcement').textContent=text;}
+function romanticMessage(text){
+  const hint=$('#explore-hint');hint.textContent=text;
+  hint.classList.add('romantic-message','is-visible');hintUntil=performance.now()+3400;announce(text);
+}
 function setPhase(next){phase=next;app.dataset.phase=next;canvasUI.inert=next!=='exploring';updateAtmosphereVisibility();}
 function setTour(active){if(active&&!reducedMotion)scenicTour.start();else scenicTour.stop();}
 function hideHint(){$('#object-hint').hidden=true;delete canvas.dataset.hover;}
@@ -251,7 +271,7 @@ function moveTo(position,lookAt,{duration=1.65,min=13,cosine=false,done=null,zoo
   const finish=()=>{Object.assign(controls,limits);controls.enableDamping=true;done?.();};
   if(reducedMotion||duration===0){
     if(zoom!==undefined)setCameraZoom(zoom);
-    flight=null;camera.position.copy(position);controls.target.copy(lookAt);Object.assign(controls,limits);controls.update();finish();
+    flight=null;camera.position.copy(position);controls.target.copy(lookAt);Object.assign(controls,limits);controls.update();camera.updateMatrixWorld();finish();
   }else{
     // Allow both endpoints until the camera has arrived; clamping to the
     // overview's minimum distance early would make a close view jump away.
@@ -331,9 +351,14 @@ function showStory(kind){
 function discover(kind){
   if(phase!=='exploring'||activeDialog||closing||contentEditorOpen||pendingPlacement)return;
   clearPetals();setTour(false);telescopeGaze.hidden=true;
-  if(kind==='sky'){
-    closeHelp();hideHint();setTour(false);savedView??=snapshot();activePlace='sky';
-    $('#return-view').hidden=false;frame('sky',true);announce('抬头看太阳和云，点回到初见可返回。');return;
+  if(kind==='snowman'||kind==='hot-cocoa'){
+    if(romantic.activate(kind)){requestSceneFrame();if(kind==='snowman')announce('小雪人晃了晃，送你三颗粉色的心。');}
+    return;
+  }
+  if(kind==='sky'||kind==='snow-yard'){
+    closeHelp();hideHint();savedView??=snapshot();activePlace=kind;
+    $('#return-view').hidden=false;frame(kind,true);
+    announce(kind==='snow-yard'?'轻碰门前的小雪人。':'抬头看看天空，夜里可以点星空许愿。');return;
   }
   if(kind==='sound'){closeHelp();hideHint();setTour(false);gardenAudio.open();return;}
   if(kind==='cabin-chime'){cabin.ringChime(reducedMotion?0:elapsed);chimes.porchStrike();announce('风铃轻响，屋里有人替我们守着家。');return;}
@@ -376,11 +401,15 @@ prepareContentEditor({
   onChange:prepareStories,
   onOpen:()=>openPanel('content'),onClose:()=>closePanel('content')
 });
-const gardenAudio=prepareGardenAudio({onOpen:()=>openPanel('sound'),onClose:()=>closePanel('sound')});
+const gardenAudio=prepareGardenAudio({onOpen:()=>openPanel('sound'),onClose:()=>closePanel('sound'),
+  seasons,camera,nightWeight:()=>benchTime.nightWeight});
+const isNight=()=>canvasUI.dataset.atmosphere==='night';
+const romantic=makeRomanticInteractions(scene,island,{gardenAudio,seasons,creekRipples,camera,
+  isNight,reducedMotion:()=>reducedMotion,notify:romanticMessage,setWishGlow:benchTime.setWishGlow});
 const fireworks=makeFireworks(scene,{sound:kind=>playfulSound(gardenAudio,kind)});
 const fireworksButton=$('#launch-fireworks'),journalDialog=$('#cabin-journal-dialog');
 function fireworksAvailable(){return phase==='exploring'&&!activeDialog&&!contentEditorOpen&&!pendingPlacement&&!intro&&!flight&&!gazing.active&&((canvasUI.dataset.atmosphere||'day')==='night'||currentView==='telescope');}
-function launchFireworks(direction){
+function launchFireworks(direction,withWish=false){
  if(!fireworksAvailable())return false;
  if(canvasUI.dataset.atmosphere!=='night')$('[data-atmo="night"]').click();
  if(fireworks.group.visible)return false;
@@ -401,6 +430,7 @@ function launchFireworks(direction){
      fireworksReturn=previous;
    }
    requestSceneFrame();announce(reducedMotion?'一颗绿紫色的心，静静亮在夜空。':'把绿与紫，一起放进今晚的星空。');
+   if(withWish)romantic.triggerWish(displayCamera);
  }
  return launched;
 }
@@ -411,9 +441,11 @@ const chimes=makeCreekChimes(scene,gardenAudio),gazing=makeStargazing(scene,pres
 const telescopeGaze=$('#telescope-gaze'),tourStatus=$('#tour-status');
 function updateTelescopeGaze(){
   telescopeGaze.hidden=scenicTour.active||currentView!=='telescope'||gazing.active||phase!=='exploring'||!!activeDialog||contentEditorOpen||!!pendingPlacement||!!flight;
-  telescopeGaze.textContent=(canvasUI.dataset.atmosphere||'day')==='day'?'🔭 切换夜幕 · 仰望星海':'🔭 透过望远镜观星';
+  telescopeGaze.textContent=['sunset','night'].includes(canvasUI.dataset.atmosphere)?'🔭 透过望远镜观星':'🔭 切换夜幕 · 仰望星海';
 }
-$('#atmosphere-switcher').addEventListener('click',()=>queueMicrotask(updateTelescopeGaze));
+$('#atmosphere-switcher').addEventListener('click',()=>queueMicrotask(()=>{
+  updateTelescopeGaze();if(currentView==='sky')caption('sky');
+}));
 telescopeGaze.addEventListener('click',()=>{setTour(false);telescopeGaze.hidden=true;gazing.enter();});
 const scenicTour=createScenicTour({camera,controls,moveTo,frame,
   caption(key,w){currentView=key;caption(key);$('#view-title').textContent=w.title;$('#view-note').textContent=w.note;},
@@ -484,9 +516,8 @@ $('#help-panel .help-places').append(skyButton);
 document.querySelectorAll('[data-place]').forEach(button=>button.addEventListener('click',()=>discover(button.dataset.place)));
 $('#replay').addEventListener('click',()=>{
   clearPetals();gardenAudio.stop();intro=null;$('#skip-intro').hidden=true;
-  $('#passphrase-form').reset();$('#passphrase-form').hidden=true;$('#passphrase-error').hidden=true;$('#passphrase-input').removeAttribute('aria-invalid');$('#wax-seal').setAttribute('aria-expanded','false');
   closeHelp();savedView=null;pendingStory=null;activePlace=null;flight=null;setTour(false);props.setMailboxOpen(false,{immediate:reducedMotion});shadowUntil=elapsed+1.6;
-  $('#return-view').hidden=true;setPhase('invitation');invitation.inert=false;invitation.classList.remove('is-leaving');controls.enabled=false;$('#wax-seal').focus({preventScroll:true});
+  $('#return-view').hidden=true;frame('hero',true);
 });
 document.addEventListener('pointerdown',event=>{if(!$('#help-panel').contains(event.target)&&!$('#help-toggle').contains(event.target))closeHelp();});
 if(!document.fullscreenEnabled)$('#fullscreen').hidden=true;
@@ -516,18 +547,22 @@ controls.addEventListener('start',()=>{
   $('#explore-hint').classList.remove('is-visible');
 });
 controls.addEventListener('change',requestSceneFrame);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)requestSceneFrame();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){lastFrame=performance.now();requestSceneFrame();}});
 
 // Direct picking uses the real meshes. A small screen-space tolerance makes
 // the delicate ribbon reachable without introducing permanent floating labels.
 const raycaster=new THREE.Raycaster(),mouse=new THREE.Vector2();
-const interactive=[ribbon,...redTies,...cabin.toys.targets,cabin.chimeTarget,cabin.hitTarget,props.mailbox,props.bench,milestone.plaque,estateFeatures.swing.group,estateFeatures.picnic.group,estateFeatures.campfire.group,estateFeatures.observatory.group,...props.balloons].filter(Boolean);
+const interactive=[ribbon,...redTies,...cabin.toys.targets,...romantic.targets,cabin.chimeTarget,cabin.hitTarget,props.mailbox,props.bench,milestone.plaque,estateFeatures.swing.group,estateFeatures.picnic.group,estateFeatures.campfire.group,estateFeatures.observatory.group,...props.balloons].filter(Boolean);
 const ribbonTouchTargets=[anchors.ribbon,...redTies.map(tie=>tie.getWorldPosition(new THREE.Vector3()))].map((anchor,i)=>{
   const target=new THREE.Mesh(new THREE.SphereGeometry(1.2,10,8),new THREE.MeshBasicMaterial());
   target.name=`ribbon-touch-target-${i}`;target.position.copy(anchor);target.visible=false;
   target.userData.interaction='ribbon';target.userData.radius=1.2;scene.add(target);return target;
 });
 const occluders=[island.getObjectByName('meadow-and-soil'),island.getObjectByName('weathered-limestone-and-topsoil'),...treeAsset.trunkMeshes,...cabin.walls].filter(Boolean);
+const skyObstacles=[...occluders,treeAsset.tree.getObjectByName('Leaves_ContinuousUmbrella'),...scene.children.filter(o=>o.name==='distant-island')].filter(Boolean);
+function openSky(){
+  return (raycaster.ray.direction.y>.02||mouse.y>.20)&&!raycaster.intersectObjects(skyObstacles,true).length;
+}
 function pick(clientX,clientY){
   if(phase!=='exploring'||activeDialog||flight||intro||contentEditorOpen||pendingPlacement)return null;
   mouse.set(clientX/innerWidth*2-1,-clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
@@ -584,6 +619,10 @@ canvas.addEventListener('pointerdown',event=>{cancelHover();hideHint();if(event.
   if(event.button===0)disturbCreek(event,-.55);if(event.button===0)pressed={x:event.clientX,y:event.clientY,id:event.pointerId,moved:false};});
 function runHover(event){
   if(!event.buttons)disturbCreek(event,-.16);
+  if(!event.buttons && isNight() && phase==='exploring' && !flight && !activeDialog && !contentEditorOpen && !pendingPlacement && !gazing.realm){
+    mouse.set(event.clientX/innerWidth*2-1,1-event.clientY/innerHeight*2);raycaster.setFromCamera(mouse,camera);
+    if(romantic.hitMeteor(raycaster)&&openSky()){romantic.triggerWish(camera);hideHint();return;}
+  }
   if(gazing.active){
     hideHint();
     mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
@@ -598,6 +637,8 @@ function runHover(event){
   }
   const kind=pick(event.clientX,event.clientY);if(!kind){hideHint();return;}
   const hint=$('#object-hint');hint.textContent=kind.startsWith('surprise:')?'风里藏着一点惊喜':{'piglet-pat':'轻轻戳一下，别吵醒小猪','cabin-radio':'碰一下收音机，听听我们的歌','cabin-journal':'翻开桌上的小手账',cabin:'到窗边，看看守家的小猪','cabin-chime':'轻碰风铃，听一声铜响',swing:'轻推秋千，让春风陪你',picnic:'在草地上，留住午后',campfire:'添一点暖意，等星光落下',telescope:'借望远镜，望向星海',meadow:'走近向日葵的晨光',anniversary:'翻看我们的时光',ribbon:'轻轻展开记忆丝带',mailbox:'这里，有一只信箱',bench:'坐一会儿',archive:archiveBook?.userData.hasNewArchives?'册子里，多了一页收藏':'翻翻长椅上的册子',sound:'听听风和溪水','create-surprise':'留一点小惊喜'}[kind];
+  if(kind==='snowman')hint.textContent='轻轻碰一下雪人的红围巾';
+  if(kind==='hot-cocoa')hint.textContent='举起热可可，和我碰一杯';
   hint.style.left=`${Math.min(event.clientX+18,innerWidth-170)}px`;hint.style.top=`${Math.max(12,event.clientY-37)}px`;hint.hidden=false;canvas.dataset.hover=kind;
 }
 // Leading execution preserves single-step hover; trailing work uses only the
@@ -634,13 +675,26 @@ canvas.addEventListener('pointerup',event=>{
     }
     if(gazing.active){
       mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
-      if(!flight)gazing.pick(raycaster);return;
+      if(!flight && !gazing.realm){
+        if(gazing.hover(raycaster))gazing.pick(raycaster);
+        else if(isNight()&&openSky())romantic.triggerWish(camera);
+      }
+      return;
     }
     if(phase==='exploring'&&!activeDialog&&!contentEditorOpen&&!flight&&neuralFireflies.pick(event.clientX,event.clientY)){setTour(false);return;}
+    if(phase==='exploring'&&!activeDialog&&!contentEditorOpen&&!flight&&!intro){
+      mouse.set(event.clientX/innerWidth*2-1,1-event.clientY/innerHeight*2);
+      raycaster.setFromCamera(mouse,camera);
+      const block=raycaster.intersectObjects([...occluders,...interactive],true)[0];
+      if(islandEcology.interact(block?.point,raycaster.ray)){setTour(false);return;}
+    }
     const kind=pick(event.clientX,event.clientY);if(kind)discover(kind);
     else if(fireworksAvailable()){
       mouse.set(event.clientX/innerWidth*2-1,-event.clientY/innerHeight*2+1);raycaster.setFromCamera(mouse,camera);
-      if(raycaster.ray.direction.y>.02&&!raycaster.intersectObjects(occluders,false).length)launchFireworks(raycaster.ray.direction.clone());
+      if(openSky()){
+        const paired=raycaster.ray.direction.y>.02 && launchFireworks(raycaster.ray.direction.clone(),isNight());
+        if(!paired && isNight())romantic.triggerWish(camera);
+      }
     }
   }
 });
@@ -649,10 +703,14 @@ canvas.addEventListener('pointerleave',()=>{cancelHover();hideHint();gazing.hove
 
 const queryView=new URLSearchParams(location.search).get('view');
 frame(queryView||'hero');
+const yardButton=$('[data-place="snow-yard"]');
+let sceneDisposed=false,animationFrame;
 function animate(now){
-  requestAnimationFrame(animate);
+  if(sceneDisposed)return;
+  animationFrame=requestAnimationFrame(animate);
   const frameDelta=Math.max(0,(now-lastFrame)/1000),delta=Math.min(frameDelta,.06);lastFrame=now;
   if(document.hidden)return;
+  gardenAudio.updateSoundscape();
   // Once reading covers a settled garden, keep the last frame rather than
   // competing with photo decoding and page transitions for the GPU. Keep the
   // scene clock still as well, so returning never jumps ahead through the wind.
@@ -662,14 +720,21 @@ function animate(now){
     &&performance.now()>=overlayReadyAt&&elapsed>=shadowUntil&&stableCameraFrames>=2&&!sceneFrameRequested&&!surpriseWorld.flying;
   if(overlayRenderPaused)return;
   // The settled realm has its own sky. Only its camera and artwork need rendering.
-  if(gazing.realm && !flight && currentView==='bench' && !covered && $('#garden-ui').dataset.atmosphere!=='day'){
+  if(gazing.realm && !flight && currentView==='bench' && !covered && ['sunset','night'].includes(canvasUI.dataset.atmosphere)){
     controls.update(delta);renderer.render(gazing.realm,camera);renderCount++;return;
   }
-  if(!reducedMotion)creekEcology.update(delta,elapsed);
-  koi.update(delta,{covered,reducedMotion});
+  seasons.update(delta,frameDelta);
+  const snowCover=seasons.getSnowAccumulation();
+  if (Math.abs(snowCover-snowShadowWeight)>.035 || (snowCover!==snowShadowWeight && (snowCover===0 || snowCover===1))) {
+    snowShadowWeight=snowCover;
+    renderer.shadowMap.needsUpdate=true;
+  }
+  if(!covered&&islandEcology.update(delta,elapsed))renderer.shadowMap.needsUpdate=true;
   if(!reducedMotion)creekRipples.update(delta);
   rippleUniforms.uRippleSimTex.value=creekRipples.getTexture();
-  benchTime.update(now,delta,reducedMotion);
+  benchTime.update(now,delta,reducedMotion,snowCover,camera.position.distanceTo(controls.target));
+  if(romantic.update(frameDelta,{covered}))renderer.shadowMap.needsUpdate=true;
+  yardButton.hidden=!romantic.snowman.visible;
   cabin.updateSmoke(reducedMotion?0:elapsed);
   cabin.toys.update(delta,{covered,reducedMotion,radioPlaying:gardenAudio.musicPlaying});
   fireworks.update(delta,{covered,reducedMotion,available:phase==='exploring'&&(canvasUI.dataset.atmosphere==='night'||currentView==='telescope')&&!gazing.active});
@@ -677,7 +742,7 @@ function animate(now){
     const previous=fireworksReturn;
     moveTo(previous.position,previous.target,{duration:.85,min:previous.min,cosine:true,zoom:originalFireworksZoom,done:restoreFireworksLens});
   }
-  estateFeatures.update(reducedMotion?0:elapsed);
+  estateFeatures.update(reducedMotion?0:elapsed,seasons.getWinterWeight());
   neuralFireflies.update(delta,{warmth:benchTime.warmth,paused:covered||phase!=='exploring'||gazing.active,reducedMotion,available:phase==='exploring'&&!covered&&!pendingPlacement&&!gazing.active});
   gazing.update(currentView,phase==='exploring'&&!covered&&!pendingPlacement,elapsed,renderer,reducedMotion);
   chimes.update(delta);listeningPlayer.userData.update(delta,gardenAudio.musicPlaying&&!reducedMotion);
@@ -709,12 +774,14 @@ function animate(now){
   scenicTour.update(delta);
   if(currentView==='telescope'&&!telescopeGaze.hidden)updateTelescopeGaze();
   if(flight||intro)camera.lookAt(controls.target);else controls.update(delta);
-  if(gazing.active)fallingFoliage.mesh.visible=false;
+  const season=seasons.getSeason();
+  if(gazing.active||season==='winter'||season==='autumn')fallingFoliage.mesh.visible=false;
   else fallingFoliage.update(delta,{covered,reducedMotion});
   meadow.update(delta,{covered,reducedMotion});
-  butterflies.update(delta,{covered,reducedMotion,windTime:fallingFoliage.mesh.userData.wind.clock});
+  butterflies.group.visible=season!=='winter';
+  if(butterflies.group.visible)butterflies.update(delta,{covered,reducedMotion,windTime:fallingFoliage.mesh.userData.wind.clock});
   if(pendingStory&&elapsed>=pendingStory.at){const {kind}=pendingStory;pendingStory=null;showStory(kind);}
-  if(hintUntil&&elapsed>hintUntil){hintUntil=0;$('#explore-hint').classList.remove('is-visible');}
+  if(hintUntil&&now>hintUntil){hintUntil=0;$('#explore-hint').classList.remove('is-visible');}
   const cameraStill=camera.position.distanceToSquared(renderedPosition)<1e-12
     &&controls.target.distanceToSquared(renderedTarget)<1e-12
     &&1-Math.abs(camera.quaternion.dot(renderedRotation))<1e-12;
@@ -724,10 +791,19 @@ function animate(now){
   renderCount++;sceneFrameRequested=false;
   if(!ready){
     ready=true;document.documentElement.dataset.sceneReady='true';$('#loading').classList.add('is-ready');$('#enter').disabled=false;$('#wax-seal').disabled=false;$('#enter-direct').hidden=false;
+    enter(true);
   }
 }
 await Promise.all([renderer.compileAsync(scene,camera),gardenAudio.ready]);
-renderer.shadowMap.needsUpdate=true;lastFrame=performance.now();requestAnimationFrame(animate);
+renderer.shadowMap.needsUpdate=true;lastFrame=performance.now();animationFrame=requestAnimationFrame(animate);
+function dispose(){
+  if(sceneDisposed)return;
+  sceneDisposed=true;cancelAnimationFrame(animationFrame);cancelHover();
+  romantic.dispose();gardenAudio.dispose();benchTime.dispose();
+  fireworks.dispose();islandEcology.dispose();seasons.dispose();creekRipples.dispose();
+  controls.dispose();renderer.dispose();
+}
+window.addEventListener('pagehide',event=>{if(!event.persisted)dispose();});
 renderer.domElement.addEventListener('webglcontextlost',event=>{
   event.preventDefault();const error=$('#scene-error');error.hidden=false;error.textContent='画面暂时中断了，请刷新页面重新打开花园。';
 });
@@ -739,8 +815,8 @@ window.addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio,1.4));renderer.setSize(innerWidth,innerHeight);
   lighting.resize(innerWidth,innerHeight);
   if(currentView==='hero'&&!intro&&!activePlace&&!scenicTour.active)frame('hero');
-  if(currentView==='cabin'&&!intro&&!activeDialog&&!contentEditorOpen&&!scenicTour.active){
-    const preset=presets.cabin;moveTo(new THREE.Vector3(...preset.position),new THREE.Vector3(...preset.target),{duration:.6,min:preset.min});
+  if(['cabin','campfire','snow-yard'].includes(currentView)&&!intro&&!activeDialog&&!contentEditorOpen&&!scenicTour.active){
+    const preset=presets[currentView];moveTo(new THREE.Vector3(...preset.position),new THREE.Vector3(...preset.target),{duration:.6,min:preset.min});
   }
 });
 motionQuery.addEventListener('change',event=>{
@@ -771,6 +847,6 @@ if(import.meta.env.DEV)window.__PU={
     button?.click();
   },
   getAtmosphere(){return $('#garden-ui').dataset.atmosphere||'day';},
-  cabin,ribbonTouchTargets,koi,fireworks,launchFireworks,
+  cabin,ribbonTouchTargets,koi,fireworks,launchFireworks,seasons,islandEcology,romantic,
   get ribbonGuideDiagnostics(){return {opened:ribbonOpened,letterOpened,shown:ribbonReminderShown,exploreTime:ribbonExploreTime,active:!!petalGuide};},
   hoverDiagnostics,neuralFireflies,ground,inside,scenicTour,presets,estateFeatures,gazing,creekEcology,creekRipples,meadow,butterflies,camera,controls,renderer,frame,statistics,waterStatistics,points,target,scene,props,anchors,treeAsset,lighting,occluders,interactive,discover,enter,returnToGarden,surpriseWorld,surprises,gardenAudio,listeningPlayer,archiveBook,get placementPending(){return Boolean(pendingPlacement);},get currentView(){return currentView;},get flying(){return !!flight||!!intro;},get phase(){return phase;},get activePlace(){return activePlace;},get overlayRenderPaused(){return overlayRenderPaused;},get renderCount(){return renderCount;},get sceneTime(){return elapsed;}};

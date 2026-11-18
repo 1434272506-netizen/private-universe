@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { ground, creekX, waterY, creekWidth, inside, onCabinFloor } from './land.js';
+import { ground, creekX, waterY, creekWidth, inside, onCabinFloor, CAMPFIRE_SITE, COCOA_STUMP } from './land.js';
 import { material } from './materials.js';
 
 function safeMerge(geoms) {
@@ -74,10 +74,10 @@ export function makeEstateFeatures(parent, time) {
       observatory.setWarmth(v);
       meadows.setWarmth(v);
     },
-    update(elapsed) {
+    update(elapsed, winterWeight = 0) {
       bridge.update(elapsed, warmthLevel);
       lanterns.update(elapsed, warmthLevel);
-      campfire.update(elapsed, warmthLevel);
+      campfire.update(elapsed, warmthLevel, winterWeight);
       picnic.update(elapsed, warmthLevel);
       swing.update(elapsed);
       meadows.update(elapsed, warmthLevel);
@@ -632,7 +632,7 @@ function makeCozyCampfire(parent, time) {
   fireGroup.userData.interaction = 'campfire';
   parent.add(fireGroup);
 
-  const cx = 15.0, cz = -1.6;
+  const {x:cx,z:cz} = CAMPFIRE_SITE;
   const cy = ground(cx, cz);
 
   // A. 围炉鹅卵石圈 (12块平滑河石)
@@ -691,26 +691,84 @@ function makeCozyCampfire(parent, time) {
   fireLight.name = 'campfire-glow-light';
   fireGroup.add(fireLight);
 
+  // THREE.Fire's advected turbulence and hot-core colour ramp, evaluated on
+  // three curved ribbons so the small hearth needs no texture or ray march.
+  const flameParts=[];
+  for(let i=0;i<3;i++){
+    const ribbon=new THREE.PlaneGeometry(.72,1.18,4,14).translate(0,.59,0);
+    const position=ribbon.attributes.position,uv=ribbon.attributes.uv;
+    const phase=i*Math.PI/3,phases=new Float32Array(position.count).fill(phase);
+    for(let j=0;j<position.count;j++){
+      const h=uv.getY(j),x=position.getX(j);
+      position.setXYZ(j,x*(1-.68*h),position.getY(j),.085*Math.sin(h*Math.PI)*(1-x*x/.13));
+    }
+    ribbon.rotateY(phase);ribbon.computeVertexNormals();
+    ribbon.setAttribute('aFlamePhase',new THREE.BufferAttribute(phases,1));
+    flameParts.push(ribbon);
+  }
+  const flameGeometry=mergeGeometries(flameParts);
+  flameParts.forEach(g=>g.dispose());
+  const flameUniforms={uFireClock:{value:0},uFireGain:{value:0},uFireWinter:{value:0}};
+  const flameMaterial=new THREE.MeshStandardMaterial({color:'#ff6a00',emissive:'#ff6a00',
+    emissiveIntensity:2.8,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true,roughness:1});
+  flameMaterial.onBeforeCompile=shader=>{
+    Object.assign(shader.uniforms,flameUniforms);
+    const uniforms='uniform float uFireClock,uFireGain,uFireWinter;\nvarying vec2 vFireUv;\nvarying float vFirePhase;\n';
+    shader.vertexShader=uniforms+'attribute float aFlamePhase;\n'+shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+      vFireUv=uv;vFirePhase=aFlamePhase;
+      float h=uv.y,phase=aFlamePhase;
+      float bend=(.065*sin(uFireClock*4.8-h*7.0+phase)+.035*sin(uFireClock*8.1-h*11.0))*h*h;
+      transformed.x+=cos(phase)*bend+.034*h*h*uFireWinter;
+      transformed.z+=sin(phase)*bend+.024*sin(uFireClock*2.0+h*5.0)*h*h;
+      transformed.y*=1.0+(.075*sin(uFireClock*3.2+phase)+.035*sin(uFireClock*7.3+phase))*h;`);
+    shader.fragmentShader=uniforms+shader.fragmentShader
+      .replace('#include <color_fragment>',`#include <color_fragment>
+        float h=vFireUv.y;
+        float curl=.10*sin(h*17.0-uFireClock*5.0+vFirePhase)+.04*sin(h*31.0-uFireClock*8.7);
+        float edge=abs(vFireUv.x*2.0-1.0+curl*h);
+        float plume=(1.0-smoothstep(.68,1.0,edge))*smoothstep(0.0,.055,h)*(1.0-smoothstep(.79,1.0,h));
+        float heat=clamp(h+.24*edge+.055*sin(h*12.0-uFireClock*5.0),0.0,1.0);
+        vec3 fireColour=mix(vec3(1.0,.83,.30),vec3(1.0,.24,.012),smoothstep(.08,.56,heat));
+        fireColour=mix(fireColour,vec3(.75,.025,.001),smoothstep(.55,1.0,heat));
+        diffuseColor.rgb=vec3(0.0);diffuseColor.a*=plume*uFireGain;`)
+      .replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\ntotalEmissiveRadiance=fireColour*2.8;');
+  };
+  flameMaterial.customProgramCacheKey=()=> 'winter-campfire-ribbons-v1';
+  const flames=new THREE.Mesh(flameGeometry,flameMaterial);
+  flames.name='campfire-flame-tongues';flames.position.set(cx,cy+.12,cz);flames.frustumCulled=false;
+  fireGroup.add(flames);
+
   const sparkGeometry = new THREE.BufferGeometry();
-  const sparkPositions = new Float32Array(48 * 3);
-  sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+  const sparkPositions = new Float32Array(96 * 3),sparkFades=new Float32Array(96);
+  sparkGeometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3).setUsage(THREE.DynamicDrawUsage));
+  sparkGeometry.setAttribute('aSparkFade',new THREE.BufferAttribute(sparkFades,1).setUsage(THREE.DynamicDrawUsage));
   const sparkMaterial = new THREE.PointsMaterial({color:'#ffd58a',size:.035,transparent:true,
     opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
+  sparkMaterial.onBeforeCompile=shader=>{
+    shader.vertexShader='attribute float aSparkFade;varying float vSparkFade;\n'+shader.vertexShader
+      .replace('#include <begin_vertex>','#include <begin_vertex>\nvSparkFade=aSparkFade;');
+    shader.fragmentShader='varying float vSparkFade;\n'+shader.fragmentShader
+      .replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.a*=vSparkFade*(1.0-smoothstep(.15,.50,length(gl_PointCoord-.5)));');
+  };
+  sparkMaterial.customProgramCacheKey=()=> 'campfire-soft-embers-v1';
   const sparks = new THREE.Points(sparkGeometry, sparkMaterial);
   sparks.name = 'campfire-rising-sparks';sparks.frustumCulled=false;
+  // The solid logs receive stoking gestures. The point-cloud hit radius
+  // would otherwise intercept both porcelain mugs even when sparks are dark.
+  sparks.raycast=()=>{};
   fireGroup.add(sparks);
-  let stokeTime=-999,lastElapsed=0,sparkClock=0;
+  let stokeTime=-999,lastElapsed=0,sparkClock=0,clock=0,winter=0,warmthLevel=0,disposed=false;
 
   // E. 两个原木树桩坐凳 (Log Stools)
   const stoolGeoms = [];
   const stoolPositions = [
-    [cx - 0.78, cz - 0.58],
-    [cx + 0.72, cz + 0.65]
+    COCOA_STUMP,
+    {x:cx + 0.72,z:cz + 0.65,height:.38,radius:.18}
   ];
-  for (const [stX, stZ] of stoolPositions) {
+  for (const {x:stX,z:stZ,height,radius} of stoolPositions) {
     const stY = ground(stX, stZ);
-    const stool = new THREE.CylinderGeometry(0.18, 0.21, 0.38, 10);
-    stool.translate(stX, stY + 0.19, stZ);
+    const stool = new THREE.CylinderGeometry(radius, radius+.03, height, 16);
+    stool.translate(stX, stY + height/2, stZ);
     stoolGeoms.push(stool);
   }
   const stoolMesh = new THREE.Mesh(safeMerge(stoolGeoms), material('wood', '#8f7253'));
@@ -719,42 +777,67 @@ function makeCozyCampfire(parent, time) {
   stoolMesh.name = 'campfire-log-stools';
   fireGroup.add(stoolMesh);
 
+  function applyGlow(flicker=0){
+    const age=Math.max(0,clock-stokeTime);
+    const boost=age<5?(1+Math.cos(Math.PI*age/5))*.5:0;
+    const glow=Math.max(warmthLevel,boost*.65,winter);
+    emberMat.emissiveIntensity=glow*(2.2+flicker)*(1+boost);
+    fireLight.intensity=THREE.MathUtils.lerp(glow*(1.35+flicker*.8)*(1+boost),2.4,winter);
+    fireLight.distance=THREE.MathUtils.lerp(7,9.5,winter);
+    flameUniforms.uFireGain.value=glow*.92;
+    flameUniforms.uFireWinter.value=winter;
+    flames.visible=sparks.visible=glow>.01;
+    flames.scale.set(.74+.26*winter,.48+.52*winter+.18*boost,.74+.26*winter);
+    sparkMaterial.opacity=glow*(.55+boost*.35);
+    sparkMaterial.size=.035+.014*winter;
+    return boost;
+  }
+  applyGlow();
   return {
     group: fireGroup,
-    stoke() { stokeTime=lastElapsed; },
+    stoke() { if(!disposed){stokeTime=clock;applyGlow();} },
     setWarmth(v) {
-      emberMat.emissiveIntensity = v * 2.2;
-      fireLight.intensity = v * 1.35;
+      if(disposed)return;
+      warmthLevel=THREE.MathUtils.clamp(Number.isFinite(v)?v:0,0,1);applyGlow();
     },
-    update(elapsed, warmth) {
-      const dt=Math.max(0,elapsed-lastElapsed);lastElapsed=elapsed;
-      const age=Math.max(0,elapsed-stokeTime);
-      const boost=age<5 ? (1+Math.cos(Math.PI*age/5))*.5 : 0;
-      const glow=Math.max(warmth,boost*.65);
-      const flicker = Math.sin(elapsed * 7.5) * 0.14 + Math.cos(elapsed * 12.0) * 0.08;
-      emberMat.emissiveIntensity = glow * (2.2 + flicker) * (1+boost);
-      fireLight.intensity = glow * (1.35 + flicker * .8) * (1+boost);
-      sparkClock+=dt*(.32+boost*.35);
-      sparkMaterial.opacity=glow*(.55+boost*.35);
-      sparks.visible=glow>.01;
-      for(let i=0;i<48;i++){
-        const h=(i/48+sparkClock*(1+(i%5)*.06))%1;
-        const a=i*2.399+elapsed*.7+h*3;
-        const radius=.04+h*.22;
-        sparkPositions[i*3]=cx+Math.cos(a)*radius;
-        sparkPositions[i*3+1]=cy+.2+h*1.6;
-        sparkPositions[i*3+2]=cz+Math.sin(a)*radius;
+    setWinter(value){
+      if(disposed)return;
+      winter=THREE.MathUtils.clamp(Number.isFinite(value)?value:0,0,1);applyGlow();
+    },
+    update(elapsed, warmth=warmthLevel, winterWeight=winter) {
+      if(disposed||!Number.isFinite(elapsed))return;
+      // Frozen elapsed values retain both flame phase and particle positions.
+      const dt=Math.min(.1,Math.max(0,elapsed-lastElapsed));lastElapsed=elapsed;clock+=dt;
+      warmthLevel=THREE.MathUtils.clamp(Number.isFinite(warmth)?warmth:0,0,1);
+      winter=THREE.MathUtils.clamp(Number.isFinite(winterWeight)?winterWeight:0,0,1);
+      const boost=applyGlow(Math.sin(clock*7.5)*.14+Math.cos(clock*12)*.08);
+      flameUniforms.uFireClock.value=clock;
+      sparkClock+=dt*(.32+boost*.35+.15*winter);
+      for(let i=0;i<96;i++){
+        const h=(i/96+sparkClock*(1+(i%5)*.06))%1;
+        const a=i*2.399+clock*.7+h*3;
+        const radius=(.04+h*.22)*(1+winter);
+        sparkPositions[i*3]=cx+Math.cos(a)*radius+winter*.48*h*h;
+        sparkPositions[i*3+1]=cy+.2+h*(1.6+1.6*winter);
+        sparkPositions[i*3+2]=cz+Math.sin(a)*radius+winter*.13*h*Math.sin(clock*.6);
+        sparkFades[i]=(i<48?1:winter)*THREE.MathUtils.smoothstep(h,0,.07)*(1-THREE.MathUtils.smoothstep(h,.65,1));
       }
       sparkGeometry.attributes.position.needsUpdate=true;
+      sparkGeometry.attributes.aSparkFade.needsUpdate=true;
     },
     dispose() {
+      if(disposed)return;disposed=true;
       fireGroup.removeFromParent();
       stoneMesh.geometry.dispose();
+      stoneMesh.material.dispose();
       logMesh.geometry.dispose();
+      logMesh.material.dispose();
       emberMesh.geometry.dispose();
       emberMat.dispose();
       sparkGeometry.dispose();sparkMaterial.dispose();
       stoolMesh.geometry.dispose();
+      stoolMesh.material.dispose();
+      flameGeometry.dispose();flameMaterial.dispose();fireLight.dispose();
     }
   };
 }

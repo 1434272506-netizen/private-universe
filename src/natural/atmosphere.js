@@ -15,9 +15,9 @@ export function makeAtmosphere(scene,renderer,time){
   uniforms.cloudScale.value=.0016;uniforms.cloudSpeed.value=.000006;
   // Sky's native model treats the lower hemisphere as ground. Here the garden
   // floats above a cloud sea: retain air colour below the astronomical horizon.
-  uniforms.dusk={value:0}; uniforms.night={value:0};
+  uniforms.dusk={value:0}; uniforms.night={value:0};uniforms.wishGlow={value:0};
   Object.assign(uniforms,makeFireworkBackdropUniforms());
-  sky.material.fragmentShader=FIREWORK_BACKDROP+'\nuniform float dusk,night;\n'+sky.material.fragmentShader;
+  sky.material.fragmentShader=FIREWORK_BACKDROP+'\nuniform float dusk,night,wishGlow;\n'+sky.material.fragmentShader;
   sky.material.fragmentShader=sky.material.fragmentShader.replace(
     'gl_FragColor = vec4( texColor, 1.0 );',`
     vec3 lowerAir=mix(vec3(.66,.73,.77),vec3(.22,.43,.67),smoothstep(-.95,.15,direction.y));
@@ -152,6 +152,8 @@ export function makeAtmosphere(scene,renderer,time){
     // Deep Sky Dome Compositing with rich cosmic sapphire atmosphere
     vec3 darkSky = mix(vec3(0.014, 0.024, 0.060), vec3(0.042, 0.062, 0.105), horizon);
     vec3 dark = darkSky + exposeGalaxy(galaxyLight,direction) + moonBody + corona;
+    float wishBand=exp(-5.0*abs(direction.y-.27-.12*sin(4.0*direction.x+2.0*direction.z)));
+    dark+=wishGlow*(vec3(.016,.018,.038)+mix(vec3(.05,.14,.11),vec3(.15,.065,.16),direction.x*.5+.5)*wishBand);
     gl_FragColor = vec4(mix(texColor, dark, night), 1.0);`);
   // At the two settled endpoints the other sky has exactly zero blend weight.
   // Skip that hidden FBM/scattering work; transitions retain both original paths.

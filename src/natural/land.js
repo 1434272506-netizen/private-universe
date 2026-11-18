@@ -13,6 +13,8 @@ export function onCabinFloor(x,z,margin=0) {
   return Math.abs(across)<2.25+margin && forward>-1.8-margin && forward<3.62+margin;
 }
 export const BENCH_SITE = {x:11.0,z:3.0};
+export const CAMPFIRE_SITE = {x:15,z:-1.6};
+export const COCOA_STUMP = {x:CAMPFIRE_SITE.x-.78,z:CAMPFIRE_SITE.z-.58,height:.38,radius:.29};
 export const boundary = a => 1 + .075 * Math.sin(a * 3 + .4) + .058 * Math.cos(a * 5 - 1) + .025 * Math.sin(a * 9 + .7);
 export const inside = (x, z, margin = 1) => Math.hypot(x / RX, z / RZ) < boundary(Math.atan2(z / RZ, x / RX)) * margin;
 export const creekX = z => .12 + z * .73 + 1.32 * Math.sin(z * .46);
@@ -21,13 +23,19 @@ export const creekSlope = z => .73 + 1.32 * .46 * Math.cos(z * .46);
 export const waterY = z => .20 - z * .018;
 export const creekWidth = z => .43 + .08 * Math.sin(z * 1.4);
 
+export function creekDepthAt(z) {
+  const pool = Math.exp(-((z + .5) ** 2) / 6);
+  const exitTaper = THREE.MathUtils.smoothstep(z, .8, 5.2);
+  return THREE.MathUtils.lerp(.36 + .08 * pool, .14, exitTaper);
+}
+
 // Shared with roots, grass, furniture and water; keep their ground contacts exact.
 export function ground(x, z) {
   const d = Math.abs(x - creekX(z)) / 1.2, w = creekWidth(z);
   const bank = THREE.MathUtils.smoothstep(d, w * .6, w + 1.05);
   const upland = .52 * Math.exp(-((x-TREE_SITE.x)**2 / 30 + (z-TREE_SITE.z)**2 / 18));
   const terrain = upland + .45 + fbm(x * .45 + 10, z * .45) * .55 + .09 * Math.sin(x * .7 + z * .4);
-  return THREE.MathUtils.lerp(waterY(z) - .19, terrain, bank) + .014 * noise(x * 13, z * 13);
+  return THREE.MathUtils.lerp(waterY(z) - creekDepthAt(z), terrain, bank) + .014 * noise(x * 13, z * 13);
 }
 
 let exitZ = 3;
@@ -48,13 +56,14 @@ export function makeLand(scene, {detail = 'hero'} = {}) {
   const v = [], uv = [], colors = [], idx = [];
   const c = new THREE.Color();
   const meadow = new THREE.Color('#497344'), meadowLight = new THREE.Color('#7e9c64');
-  const silt = new THREE.Color('#747b64'), loam = new THREE.Color('#7a6d50');
+  const silt = new THREE.Color('#747b64'), sand = new THREE.Color('#cdb88d'), loam = new THREE.Color('#7a6d50');
 
   for (let j = 0; j <= rings; j++) {
     for (let i = 0; i < segments; i++) {
       const a = i / segments * Math.PI * 2, r = j / rings, b = boundary(a);
       const x = Math.cos(a) * RX * b * r, z = Math.sin(a) * RZ * b * r;
-      v.push(x, ground(x, z), z);
+      const y = ground(x, z);
+      v.push(x, y, z);
       uv.push(x * .31, z * .31);
       const f = fbm(x * .68 + 6, z * .68 - 2);
       const turf = fbm(x * 3.7 + 31, z * 3.7 - 17);
@@ -64,7 +73,10 @@ export function makeLand(scene, {detail = 'hero'} = {}) {
       const rootSoil = 1 - THREE.MathUtils.smoothstep(rootDistance + (fbm(x * 2, z * 2) - .5) * .42, .36, 1.16);
       c.copy(meadow).lerp(meadowLight, f * .79 + turf * .21);
       c.multiplyScalar(.87 + turf * .23);
-      c.lerp(silt, wet * .77).lerp(loam, rootSoil * .60);
+      c.lerp(silt, wet * .77);
+      const shoal = 1 - THREE.MathUtils.smoothstep(creekDepthAt(z), .14, .40);
+      const submerged = THREE.MathUtils.smoothstep(waterY(z) - y, -.025, .045);
+      c.lerp(sand, wet * submerged * (.23 + .62 * shoal) * (.80 + .20 * turf)).lerp(loam, rootSoil * .60);
       colors.push(c.r, c.g, c.b);
     }
   }

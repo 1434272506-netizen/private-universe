@@ -57,7 +57,7 @@ export function makeStargazing(scene,bench,moveTo,frame) {
   };
   function update(view,available,time,renderer,reduced){
     const mode=ui.dataset.atmosphere;
-    if(sky.visible&&(view!=='bench'||mode==='day')){
+    if(sky.visible&&(view!=='bench'||!['sunset','night'].includes(mode))){
       reset();sky.visible=false;if(view==='bench')frame('bench',true);
     }
     if(sky.visible&&exposure===undefined){exposure=renderer.toneMappingExposure;renderer.toneMappingExposure=exposure*.85;}

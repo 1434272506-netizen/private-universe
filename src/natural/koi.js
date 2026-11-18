@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {creekX,waterY,ground} from './land.js';
+import {creekX,creekSlope,waterY,ground} from './land.js';
 
 export function makeKoi(parent,ripples){
  const group=new THREE.Group();group.name='creek-couple-koi';parent.add(group);
@@ -25,18 +25,23 @@ export function makeKoi(parent,ripples){
   for(const side of [-1,1]){const eye=new THREE.Mesh(eyeGeometry,eyeMaterial);eye.position.set(side*.036,.012,.205);root.add(eye);}
   fish.push({root,phase:i*Math.PI,position:new THREE.Vector3(),previous:new THREE.Vector3(),tailClock,speed:0,eyeGeometry,eyeMaterial});
  }
- let time=0,wake=0,disposed=false,wakesEnabled=true;
+ let time=0,wake=0,winter=0,disposed=false,wakesEnabled=true;
  function pose(){
   for(const f of fish){
-   const a=time*.32+f.phase,z=1.1+Math.sin(a),x=creekX(z)+Math.cos(a)*.11;
-   const floor=ground(x,z),surface=waterY(z),y=THREE.MathUtils.clamp(surface-.082,floor+.046,surface-.052);
-   f.root.position.set(x,y,z);f.root.rotation.y=Math.atan2(.11*-Math.sin(a)+(.73+1.32*.46*Math.cos(z*.46))*Math.cos(a),Math.cos(a));f.position.copy(f.root.position);
+   const a=time*.32+f.phase,z=1.1-1.6*winter+Math.sin(a),x=creekX(z)+Math.cos(a)*.11;
+   const floor=ground(x,z),surface=waterY(z);
+   const y=THREE.MathUtils.clamp(THREE.MathUtils.lerp(surface-.082,floor+.075,winter),floor+.046,surface-.052);
+   f.root.position.set(x,y,z);f.root.rotation.y=Math.atan2(-.11*Math.sin(a)+creekSlope(z)*Math.cos(a),Math.cos(a));f.position.copy(f.root.position);
   }
  }
- function update(delta,{covered=false,reducedMotion=false}={}){
-  if(disposed||covered||reducedMotion)return;const dt=Math.max(0,Math.min(.06,delta));for(const f of fish)f.previous.copy(f.position);time+=dt;pose();
-  for(const f of fish){f.speed=dt?f.previous.distanceTo(f.position)/dt:0;f.tailClock.value+=dt*(2.2+f.speed*7);}
-  wake-=dt;if(wake<=0){wake=1.2;if(wakesEnabled)for(const f of fish)if(waterY(f.position.z)-ground(f.position.x,f.position.z)<.23)ripples?.addImpulseWorld(f.position.x,f.position.z,.085,-.012);}
+ function update(delta,{covered=false,reducedMotion=false,winterWeight=winter}={}){
+  if(disposed||covered||(reducedMotion&&winterWeight===winter))return;
+  winter=THREE.MathUtils.clamp(winterWeight,0,1);
+  const dt=reducedMotion?0:THREE.MathUtils.clamp(delta,0,.06),swimDt=dt*(1-.75*winter);
+  for(const f of fish)f.previous.copy(f.position);
+  time+=swimDt;pose();
+  for(const f of fish){f.speed=dt?f.previous.distanceTo(f.position)/dt:0;f.tailClock.value+=swimDt*2.2+dt*f.speed*7;}
+  wake-=dt;if(dt&&wake<=0){wake=1.2;if(wakesEnabled&&winter<.5)for(const f of fish)if(waterY(f.position.z)-ground(f.position.x,f.position.z)<.50)ripples?.addImpulseWorld?.(f.position.x,f.position.z,.085,-.012);}
  }
  pose();
  return {group,update,setWakesEnabled(value){wakesEnabled=Boolean(value);},getState:()=>({time,count:fish.length,wakesEnabled,colours:materials.map(m=>'#'+m.color.getHexString()),fish:fish.map(f=>({position:f.position.toArray(),heading:f.root.rotation.y,speed:f.speed,tailPhase:f.tailClock.value,depth:waterY(f.position.z)-f.position.y,clearance:f.position.y-ground(f.position.x,f.position.z)}))}),dispose(){if(disposed)return;disposed=true;group.removeFromParent();geometry.dispose();materials.forEach(m=>m.dispose());fish.forEach(f=>{f.eyeGeometry.dispose();f.eyeMaterial.dispose();});}};
